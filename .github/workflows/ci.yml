@@ -1,4 +1,4 @@
-name: Continuous Integration (CI)
+name: Continuous Integration and Deployment (CI/CD)
 
 # Run CI jobs on all branches by default
 on:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: Run tests
+    name: Run tests & Code Quality
     runs-on: ubuntu-22.04
 
     steps:
@@ -21,5 +21,31 @@ jobs:
           java-version: "21"
           cache: "gradle"
 
-      - name: Run unit tests
-        run: ./gradlew test
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Run code quality, unit tests, and coverage
+        run: ./gradlew pmdMain pmdTest test jacocoTestReport
+
+  dummy-cd:
+    name: Dummy Continuous Deployment
+    needs: test
+    runs-on: ubuntu-22.04
+
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+
+    steps:
+      - name: Simulate Deployment Logic
+        run: |
+          echo "Verifying CI pipeline status (Code Quality & Unit Tests)... ALL CHECKS PASSED."
+          echo "Initiating simulated continuous deployment script..."
+  
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENVIRONMENT: Preparing PRODUCTION environment."
+            echo "DEPLOYMENT: Deploying 'main' branch codebase to the Render Production server..."
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "ENVIRONMENT: Preparing STAGING environment."
+            echo "DEPLOYMENT: Deploying 'staging' branch codebase to the Render Staging server..."
+          fi
+          
+          echo "Simulated deployment process completed successfully."
