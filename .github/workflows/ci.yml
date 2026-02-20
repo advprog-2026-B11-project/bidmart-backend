@@ -1,13 +1,12 @@
-name: Continuous Integration (CI)
+name: Continuous Integration and Deployment (CI/CD)
 
-# Run CI jobs on all branches by default
 on:
   push:
   pull_request:
 
 jobs:
   test:
-    name: Run tests
+    name: Run tests & Code Quality
     runs-on: ubuntu-22.04
 
     steps:
@@ -21,5 +20,17 @@ jobs:
           java-version: "21"
           cache: "gradle"
 
-      - name: Run unit tests
-        run: ./gradlew test
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Run code quality, unit tests, and coverage
+        run: ./gradlew pmdMain pmdTest test jacocoTestReport
+
+  deploy:
+    name: Deploy to Render
+    needs: test
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger Render Deployment
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
