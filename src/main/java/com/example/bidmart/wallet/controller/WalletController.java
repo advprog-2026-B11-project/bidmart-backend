@@ -1,7 +1,7 @@
-package com.example.bidmart.controller;
+package com.example.bidmart.wallet.controller;
 
-import com.example.bidmart.model.Wallet;
-import com.example.bidmart.repository.WalletRepository;
+import com.example.bidmart.wallet.model.Wallet;
+import com.example.bidmart.wallet.repository.WalletRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

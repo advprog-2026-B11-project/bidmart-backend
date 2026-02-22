@@ -1,4 +1,4 @@
-package com.example.bidmart.model;
+package com.example.bidmart.wallet.model;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
