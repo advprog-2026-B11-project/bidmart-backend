@@ -1,7 +1,8 @@
 package com.example.bidmart.controller;
 
-import com.example.bidmart.model.Wallet;
-import com.example.bidmart.repository.WalletRepository;
+import com.example.bidmart.wallet.model.Wallet;
+import com.example.bidmart.wallet.repository.WalletRepository;
+import com.example.bidmart.wallet.controller.WalletController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
