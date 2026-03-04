@@ -22,7 +22,7 @@ public class User {
     private String email;
 
     @Column(name = "phone_number", unique = true)
-    private String phoneNumber; // Disiapkan untuk 2FA nanti
+    private String phoneNumber;
 
     @Column(name = "display_name", nullable = false)
     private String displayName;

@@ -48,7 +48,6 @@ public class AuthServiceImpl implements AuthService {
         user.setRole(Role.USER);
         user.setEmailVerified(false);
 
-        // Simulate email verification token generation
         String verificationToken = UUID.randomUUID().toString();
         user.setVerificationToken(verificationToken);
 
@@ -69,7 +68,6 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
-        // Persist the refresh token as a Session entity
         Session session = Session.builder()
                 .user(user)
                 .refreshToken(refreshToken)
