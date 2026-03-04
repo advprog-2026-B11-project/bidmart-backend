@@ -16,10 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Intercepts every request to extract and validate a JWT from the Authorization header.
- * Single Responsibility: only JWT extraction and SecurityContext population.
- */
+
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -62,7 +59,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            // Invalid token — just continue without setting authentication
             logger.debug("JWT authentication failed: " + e.getMessage());
         }
 
