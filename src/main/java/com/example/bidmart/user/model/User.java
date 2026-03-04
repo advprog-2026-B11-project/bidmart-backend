@@ -36,4 +36,7 @@ public class User {
 
     @Column(name = "is_email_verified", nullable = false)
     private boolean isEmailVerified = false;
+
+    @Column(name = "verification_token")
+    private String verificationToken;
 }
