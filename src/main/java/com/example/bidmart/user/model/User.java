@@ -1,4 +1,4 @@
-package com.example.bidmart.user.model; // Disesuaikan dengan struktur BidMart
+package com.example.bidmart.user.model;
 
 import jakarta.persistence.*;
 import lombok.Getter;
