@@ -1,7 +1,14 @@
 package com.example.bidmart.user.service;
 
-import com.example.bidmart.user.model.User;
+import com.example.bidmart.user.dto.AuthResponse;
+import com.example.bidmart.user.dto.LoginRequest;
+import com.example.bidmart.user.dto.RegisterRequest;
 
 public interface AuthService {
-    User register(String username, String email, String displayName, String password);
+    
+    AuthResponse register(RegisterRequest request);
+    
+    AuthResponse login(LoginRequest request);
+    
+    boolean verifyEmail(String token); 
 }
