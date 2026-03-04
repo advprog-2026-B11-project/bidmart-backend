@@ -22,7 +22,7 @@ public class ListingService {
         listing.setCreatedAt(LocalDateTime.now());
         return listingRepository.save(listing);
     }
-s
+
     public List<Listing> getAllListings() {
         return listingRepository.findAll();
     }
