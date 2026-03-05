@@ -36,7 +36,7 @@ public class NotificationController {
     @PostMapping("/test-create")
     public ResponseEntity<Notification> createTestNotification(@RequestBody Map<String, String> requestBody) {
         UUID userId = UUID.fromString(requestBody.get("userId"));
-        String type = requestBody.get("type"); // Contoh: "NEW_BID", "AUCTION_WON"
+        String type = requestBody.get("type");
         String message = requestBody.get("message");
 
         Notification newNotification = notificationService.createNotification(userId, type, message);
