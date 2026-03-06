@@ -1,4 +1,4 @@
-package com.example.bidmart.listing.model;
+package com.example.bidmart.wallet.model;
 
 import jakarta.persistence.*;
 import java.util.UUID;
