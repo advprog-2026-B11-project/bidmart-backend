@@ -1,28 +1,36 @@
-package com.example.bidmart.wallet.model;
+package com.example.bidmart.listing.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
+import java.util.UUID;
 import java.math.BigDecimal;
 
+import lombok.*;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+
 @Entity
+@Table(name = "wallets")
 public class Wallet {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    private String username;
-    private BigDecimal balance;
+    @Column(name = "user_id", nullable = false, unique = true)
+    private UUID userId;
 
-    public Wallet() {}
+    @Column(nullable = false)
+    private BigDecimal balanceAvailable = BigDecimal.ZERO;
 
-    public Wallet(String username, BigDecimal balance) {
-        this.username = username;
-        this.balance = balance;
+    @Column(nullable = false)
+    private BigDecimal balanceLocked = BigDecimal.ZERO;
+
+    public Wallet(UUID userId) {
+        this.userId = userId;
+        this.balanceAvailable = BigDecimal.ZERO;
+        this.balanceLocked = BigDecimal.ZERO;
     }
-
-    public Long getId() { return id; }
-    public String getUsername() { return username; }
-    public BigDecimal getBalance() { return balance; }
 }
