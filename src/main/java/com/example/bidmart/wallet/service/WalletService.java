@@ -5,6 +5,7 @@ import com.example.bidmart.wallet.repository.WalletRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,5 +44,9 @@ public class WalletService {
 
         wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(amount));
         return walletRepository.save(wallet);
+    }
+
+    public List<Wallet> findAll() {
+        return walletRepository.findAll();
     }
 }
