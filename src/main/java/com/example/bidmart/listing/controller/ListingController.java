@@ -2,6 +2,7 @@ package com.example.bidmart.listing.controller;
 
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,13 +20,14 @@ public class ListingController {
     }
 
     @PostMapping
-    public Listing createListing(@RequestBody Listing listing) {
-        return listingService.createListing(listing);
+    public ResponseEntity<Listing> createListing(@RequestBody Listing listing) {
+        Listing created = listingService.createListing(listing);
+        return ResponseEntity.ok(created);
     }
 
     @GetMapping
-    public List<Listing> getAllListings() {
-        return listingService.getAllListings();
+    public ResponseEntity<List<Listing>> getAllListings() {
+        return ResponseEntity.ok(listingService.getAllListings());
     }
 
     @GetMapping("/{id}")
