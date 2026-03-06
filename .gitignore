@@ -40,3 +40,4 @@ out/
 # local credential
 application-local.properties
 .env
+Rulebook.md
