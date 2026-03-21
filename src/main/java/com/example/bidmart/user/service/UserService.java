@@ -7,4 +7,5 @@ import com.example.bidmart.user.dto.UserProfileResponse;
 public interface UserService {
     UserProfileResponse getCurrentUser(String username);
     UserProfileResponse updateProfile(String username, UpdateProfileRequest request);
+    void deleteProfile(String username);
 }
