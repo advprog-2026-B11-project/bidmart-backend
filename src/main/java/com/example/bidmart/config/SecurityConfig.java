@@ -32,7 +32,16 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/error").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/api/wallet/**").permitAll()
+                .requestMatchers("/api/wallet/**").permitAll()
+                .requestMatchers("/listings/**").permitAll()
+                .requestMatchers("/api/bids/mocks/**").permitAll()
+                .requestMatchers("/api/bids/**").permitAll()
+                .requestMatchers("/api/orders/**").permitAll()
+
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
