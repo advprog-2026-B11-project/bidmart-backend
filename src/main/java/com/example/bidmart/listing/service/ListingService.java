@@ -2,12 +2,11 @@ package com.example.bidmart.listing.service;
 
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
 
 @Service
 public class ListingService {
@@ -18,8 +17,14 @@ public class ListingService {
         this.listingRepository = listingRepository;
     }
 
-    public Listing createListing(Listing listing) {
+    public Listing createListing(Listing listing, UUID sellerId) {
+        listing.setSellerId(sellerId);
         listing.setCreatedAt(LocalDateTime.now());
+
+        if (listing.getStatus() == null || listing.getStatus().isBlank()) {
+            listing.setStatus("ACTIVE");
+        }
+
         return listingRepository.save(listing);
     }
 

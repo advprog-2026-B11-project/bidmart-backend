@@ -49,9 +49,13 @@ public class MockListingService {
                 .toList();
     }
 
-    public ListingSnapshot upsert(MockListingUpsertRequest request) {
+    public ListingSnapshot upsert(MockListingUpsertRequest request, UUID authenticatedSellerId) {
         if (request == null) {
             throw new BidValidationException("Request mock listing tidak boleh null.");
+        }
+
+        if (authenticatedSellerId == null) {
+            throw new BidValidationException("sellerId wajib diisi.");
         }
 
         BigDecimal startingPrice = request.startingPrice() == null ? BigDecimal.ZERO : request.startingPrice();
@@ -59,8 +63,13 @@ public class MockListingService {
             throw new BidValidationException("Starting price mock listing tidak boleh negatif.");
         }
 
+        UUID requestedSellerId = request.sellerId();
+        if (requestedSellerId != null && !requestedSellerId.equals(authenticatedSellerId)) {
+            throw new BidValidationException("sellerId pada payload harus sama dengan user yang sedang login.");
+        }
+
         UUID listingId = request.id() == null ? UUID.randomUUID() : request.id();
-        UUID sellerId = request.sellerId() == null ? DEFAULT_SELLER_ID : request.sellerId();
+        UUID sellerId = authenticatedSellerId;
         LocalDateTime endTime = request.endTime() == null ? LocalDateTime.now().plusDays(1) : request.endTime();
         String status = request.status() == null || request.status().isBlank() ? "ACTIVE" : request.status();
 

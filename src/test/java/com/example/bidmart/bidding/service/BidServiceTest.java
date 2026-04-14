@@ -69,9 +69,8 @@ class BidServiceTest {
 
         mockWalletService.setAvailableBalance(buyerId, new BigDecimal("1000.00"));
 
-        BidResponse response = bidService.placeBid(new CreateBidRequest(
+        BidResponse response = bidService.placeBid(buyerId, new CreateBidRequest(
                 listingId,
-                buyerId,
                 new BigDecimal("150.00"),
                 Boolean.FALSE,
                 null
@@ -108,9 +107,8 @@ class BidServiceTest {
 
         mockWalletService.setAvailableBalance(buyerId, new BigDecimal("1000.00"));
 
-        assertThrows(BidValidationException.class, () -> bidService.placeBid(new CreateBidRequest(
+        assertThrows(BidValidationException.class, () -> bidService.placeBid(buyerId, new CreateBidRequest(
                 listingId,
-                buyerId,
                 new BigDecimal("150.00"),
                 Boolean.FALSE,
                 null
@@ -139,9 +137,8 @@ class BidServiceTest {
 
         mockWalletService.setAvailableBalance(buyerId, new BigDecimal("50.00"));
 
-        assertThrows(InsufficientBalanceException.class, () -> bidService.placeBid(new CreateBidRequest(
+        assertThrows(InsufficientBalanceException.class, () -> bidService.placeBid(buyerId, new CreateBidRequest(
                 listingId,
-                buyerId,
                 new BigDecimal("120.00"),
                 Boolean.FALSE,
                 null
@@ -188,9 +185,8 @@ class BidServiceTest {
 
         mockWalletService.setAvailableBalance(newBuyerId, new BigDecimal("500.00"));
 
-        bidService.placeBid(new CreateBidRequest(
+        bidService.placeBid(newBuyerId, new CreateBidRequest(
                 listingId,
-                newBuyerId,
                 new BigDecimal("250.00"),
                 Boolean.FALSE,
                 null

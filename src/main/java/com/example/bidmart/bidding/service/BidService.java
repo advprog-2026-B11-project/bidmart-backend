@@ -32,13 +32,13 @@ public class BidService {
     }
 
     @Transactional
-    public BidResponse placeBid(CreateBidRequest request) {
-        validateCreateBidRequest(request);
+    public BidResponse placeBid(UUID buyerId, CreateBidRequest request) {
+        validateCreateBidRequest(request, buyerId);
 
         ListingSnapshot listing = listingLookupService.findById(request.listingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Listing tidak ditemukan: " + request.listingId()));
 
-        validateListingForBid(listing, request.buyerId());
+        validateListingForBid(listing, buyerId);
 
         Optional<Bid> currentHighestBid = bidRepository
                 .findTopByListingIdOrderByAmountDescCreatedAtAsc(request.listingId());
@@ -49,21 +49,21 @@ public class BidService {
         BigDecimal reserveTarget = resolveReserveTarget(request.amount(), proxyBid, request.proxyMaxLimit());
 
         Optional<Bid> latestBidByBuyer = bidRepository
-                .findTopByListingIdAndBuyerIdOrderByCreatedAtDesc(request.listingId(), request.buyerId());
+                .findTopByListingIdAndBuyerIdOrderByCreatedAtDesc(request.listingId(), buyerId);
 
         BigDecimal previousReservedAmount = latestBidByBuyer
                 .map(Bid::getReservedAmount)
                 .orElse(BigDecimal.ZERO);
 
         mockWalletService.reserveBidFunds(
-                request.buyerId(),
+                buyerId,
                 request.listingId(),
                 reserveTarget.max(previousReservedAmount)
         );
 
         Bid bid = new Bid();
         bid.setListingId(request.listingId());
-        bid.setBuyerId(request.buyerId());
+        bid.setBuyerId(buyerId);
         bid.setAmount(request.amount());
         bid.setProxyBid(proxyBid);
         bid.setProxyMaxLimit(proxyBid ? request.proxyMaxLimit() : null);
@@ -105,7 +105,7 @@ public class BidService {
                 .toList();
     }
 
-    private void validateCreateBidRequest(CreateBidRequest request) {
+    private void validateCreateBidRequest(CreateBidRequest request, UUID buyerId) {
         if (request == null) {
             throw new BidValidationException("Request bid tidak boleh kosong.");
         }
@@ -114,7 +114,7 @@ public class BidService {
             throw new BidValidationException("listingId wajib diisi.");
         }
 
-        if (request.buyerId() == null) {
+        if (buyerId == null) {
             throw new BidValidationException("buyerId wajib diisi.");
         }
 
