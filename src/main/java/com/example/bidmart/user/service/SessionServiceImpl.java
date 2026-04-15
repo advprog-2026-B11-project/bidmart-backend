@@ -52,5 +52,50 @@ public class SessionServiceImpl implements SessionService {
         return new SessionResponse(session.getId(), deviceInfo, session.getCreatedAt(), session.getExpiresAt());
     }
 
-    // TODO: Implementasi getActiveSessions dan revokeSession mengubah isRevoked menjadi true
+    @Override
+    @Transactional(readOnly = true)
+    public List<SessionResponse> getActiveSessions(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        List<Session> activeSessions = sessionRepository.findByUserIdAndIsRevokedFalseOrderByCreatedAtAsc(user.getId());
+
+        return activeSessions.stream()
+                .map(session -> SessionResponse.builder()
+                        .id(session.getId())
+                        .deviceInfo(session.getDeviceInfo())
+                        .createdAt(session.getCreatedAt())
+                        .expiresAt(session.getExpiresAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional
+    public void revokeSession(String username, UUID sessionId) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        Session session = sessionRepository.findByIdAndUserId(sessionId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Session not found or unauthorized to revoke."));
+
+        session.setRevoked(true);
+        sessionRepository.save(session);
+    }
+
+    @Override
+    @Transactional
+    public void revokeAllSessions(User user) {
+        List<Session> activeSessions = sessionRepository.findByUserIdAndIsRevokedFalseOrderByCreatedAtAsc(user.getId());
+
+        if (activeSessions.isEmpty()) {
+            return;
+        }
+
+        for (Session session : activeSessions) {
+            session.setRevoked(true);
+        }
+
+        sessionRepository.saveAll(activeSessions);
+    }
 }
