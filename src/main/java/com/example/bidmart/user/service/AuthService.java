@@ -7,8 +7,7 @@ import com.example.bidmart.user.dto.RegisterRequest;
 public interface AuthService {
     
     AuthResponse register(RegisterRequest request);
-    
     AuthResponse login(LoginRequest request);
-    
     boolean verifyEmail(String token); 
+    AuthResponse refreshToken(String refreshTokenStr);
 }

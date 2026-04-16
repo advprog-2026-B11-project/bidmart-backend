@@ -24,15 +24,18 @@ public class AuthServiceImpl implements AuthService {
     private final SessionRepository sessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final SessionService sessionService;
 
     public AuthServiceImpl(UserRepository userRepository,
-                           SessionRepository sessionRepository,
-                           PasswordEncoder passwordEncoder,
-                           JwtService jwtService) {
+                            SessionRepository sessionRepository,
+                            PasswordEncoder passwordEncoder,
+                            JwtService jwtService,
+                            SessionService sessionService) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.sessionService = sessionService;
     }
 
     @Override
@@ -123,5 +126,22 @@ public class AuthServiceImpl implements AuthService {
                 .displayName(user.getDisplayName())
                 .role(user.getRole().name())
                 .build();
+    }
+
+    @Override
+    public AuthResponse refreshToken(String refreshTokenStr) {
+        Session session = sessionRepository.findByRefreshToken(refreshTokenStr).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token."));
+        if (session.isRevoked() || session.getExpiresAt().isBefore(Instant.now())){
+            throw new IllegalArgumentException("Refresh token expired or revoked. Please login again.");
+        }
+        User user = session.getUser();
+
+        session.setRevoked(true);
+        sessionRepository.save(session);
+        String newAccessToken = jwtService.generateAccessToken(user);
+        String newRefreshToken = jwtService.generateRefreshToken(user);
+        sessionService.createSession(user, newRefreshToken, session.getDeviceInfo());
+
+        return mapToAuthResponse(user, newAccessToken, newRefreshToken);
     }
 }
