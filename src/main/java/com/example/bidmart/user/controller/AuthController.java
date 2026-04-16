@@ -2,6 +2,7 @@ package com.example.bidmart.user.controller;
 
 import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
+import com.example.bidmart.user.dto.RefreshTokenRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
 import com.example.bidmart.user.service.AuthService;
 import jakarta.validation.Valid;
@@ -42,5 +43,11 @@ public class AuthController {
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Verification token is invalid or not found.");
         }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        AuthResponse response = authService.refreshToken(request.getRefreshToken());
+        return ResponseEntity.ok(response);
     }
 }
