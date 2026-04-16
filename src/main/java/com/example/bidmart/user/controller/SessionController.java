@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/sessions")
-@CrossOrigin(origins = "+")
+@CrossOrigin(origins = "*")
 public class SessionController {
     private final SessionService sessionService;
 
