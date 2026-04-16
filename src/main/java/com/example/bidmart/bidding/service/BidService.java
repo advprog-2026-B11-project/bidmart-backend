@@ -6,6 +6,9 @@ import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.bidding.model.Bid;
 import com.example.bidmart.bidding.repository.BidRepository;
+import com.example.bidmart.listing.model.Listing;
+import com.example.bidmart.listing.service.ListingService;
+import com.example.bidmart.wallet.service.WalletService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,24 +21,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class BidService {
 
     private final BidRepository bidRepository;
-    private final ListingLookupService listingLookupService;
-    private final MockWalletService mockWalletService;
+    private final ListingService listingService;
+    private final WalletService walletService;
 
     public BidService(
             BidRepository bidRepository,
-            ListingLookupService listingLookupService,
-            MockWalletService mockWalletService
+            ListingService listingService,
+            WalletService walletService
     ) {
         this.bidRepository = bidRepository;
-        this.listingLookupService = listingLookupService;
-        this.mockWalletService = mockWalletService;
+        this.listingService = listingService;
+        this.walletService = walletService;
     }
 
     @Transactional
     public BidResponse placeBid(UUID buyerId, CreateBidRequest request) {
         validateCreateBidRequest(request, buyerId);
 
-        ListingSnapshot listing = listingLookupService.findById(request.listingId())
+        ListingSnapshot listing = listingService.getListingById(request.listingId())
+                .map(this::toSnapshot)
                 .orElseThrow(() -> new ResourceNotFoundException("Listing tidak ditemukan: " + request.listingId()));
 
         validateListingForBid(listing, buyerId);
@@ -55,11 +59,13 @@ public class BidService {
                 .map(Bid::getReservedAmount)
                 .orElse(BigDecimal.ZERO);
 
-        mockWalletService.reserveBidFunds(
-                buyerId,
-                request.listingId(),
-                reserveTarget.max(previousReservedAmount)
-        );
+        // Compute delta: only lock the additional amount not yet locked for this listing.
+        // If the buyer is raising their bid, we only charge the difference.
+        BigDecimal effectiveTarget = reserveTarget.max(previousReservedAmount);
+        BigDecimal additionalReserve = effectiveTarget.subtract(previousReservedAmount);
+        if (additionalReserve.compareTo(BigDecimal.ZERO) > 0) {
+            walletService.reserveBidFunds(buyerId, request.listingId(), additionalReserve);
+        }
 
         Bid bid = new Bid();
         bid.setListingId(request.listingId());
@@ -105,6 +111,20 @@ public class BidService {
                 .toList();
     }
 
+    private ListingSnapshot toSnapshot(Listing listing) {
+        BigDecimal startingPrice = listing.getStartingPrice() == null
+                ? BigDecimal.ZERO
+                : listing.getStartingPrice();
+
+        return new ListingSnapshot(
+                listing.getId(),
+                listing.getSellerId(),
+                startingPrice,
+                listing.getEndTime(),
+                listing.getStatus()
+        );
+    }
+
     private void validateCreateBidRequest(CreateBidRequest request, UUID buyerId) {
         if (request == null) {
             throw new BidValidationException("Request bid tidak boleh kosong.");
@@ -147,7 +167,8 @@ public class BidService {
         BigDecimal startingPrice = listing.startingPrice() == null ? BigDecimal.ZERO : listing.startingPrice();
 
         if (bidAmount.compareTo(startingPrice) < 0) {
-            throw new BidValidationException("Bid harus lebih besar atau sama dengan starting price " + startingPrice + ".");
+            throw new BidValidationException(
+                    "Bid harus lebih besar atau sama dengan starting price " + startingPrice + ".");
         }
 
         if (currentHighestBid.isPresent() && bidAmount.compareTo(currentHighestBid.get().getAmount()) <= 0) {
@@ -156,11 +177,7 @@ public class BidService {
     }
 
     private BigDecimal resolveReserveTarget(BigDecimal amount, boolean proxyBid, BigDecimal proxyMaxLimit) {
-        if (!proxyBid) {
-            return amount;
-        }
-
-        return proxyMaxLimit;
+        return proxyBid ? proxyMaxLimit : amount;
     }
 
     private void releasePreviousHighestBidIfOutbid(Optional<Bid> previousHighestBid, Bid latestSavedBid) {
@@ -174,7 +191,7 @@ public class BidService {
             return;
         }
 
-        mockWalletService.releaseBidFunds(
+        walletService.releaseBidFunds(
                 previous.getBuyerId(),
                 previous.getListingId(),
                 previous.getReservedAmount()

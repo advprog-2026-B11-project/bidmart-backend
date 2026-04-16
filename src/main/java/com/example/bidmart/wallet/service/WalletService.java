@@ -49,4 +49,14 @@ public class WalletService {
     public List<Wallet> findAll() {
         return walletRepository.findAll();
     }
+
+    public void reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal bidAmount) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'reserveBidFunds'");
+    }
+
+    public void releaseBidFunds(UUID eq, UUID eq2, BigDecimal eq3) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'releaseBidFunds'");
+    }
 }

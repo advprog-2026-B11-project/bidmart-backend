@@ -11,7 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(basePackageClasses = {BidController.class, BidMockController.class})
+@RestControllerAdvice(basePackageClasses = {BidController.class})
 public class BidControllerAdvice {
 
     @ExceptionHandler(ResourceNotFoundException.class)
