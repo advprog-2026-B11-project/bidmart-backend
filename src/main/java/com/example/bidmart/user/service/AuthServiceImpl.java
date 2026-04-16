@@ -61,23 +61,19 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, String deviceInfo) {
         User user = findUserByIdentifier(request.getIdentifier());
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Invalid password.");
         }
 
+        sessionService.enforceSessionLimit(user, 3);
+
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
-        Session session = Session.builder()
-                .user(user)
-                .refreshToken(refreshToken)
-                .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
-                .isRevoked(false)
-                .build();
-        sessionRepository.save(session);
+        sessionService.createSession(user, refreshToken, deviceInfo);
 
         return mapToAuthResponse(user, accessToken, refreshToken);
     }

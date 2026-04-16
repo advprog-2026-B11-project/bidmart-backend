@@ -30,8 +30,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, 
+                                            @RequestHeader(value = "User=Agent", defaultValue = "Unknown-Device") String userAgent) {
+        AuthResponse response = authService.login(request, userAgent);
         return ResponseEntity.ok(response);
     }
 
