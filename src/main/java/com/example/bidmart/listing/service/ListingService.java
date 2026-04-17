@@ -2,16 +2,13 @@ package com.example.bidmart.listing.service;
 
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
-<<<<<<< HEAD
 import com.example.bidmart.bidding.service.ListingSnapshot;
-import org.springframework.stereotype.Service;
 
-=======
->>>>>>> fc34526131289a15b36342d2f466742abbfa05a8
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.springframework.stereotype.Service;
 
 @Service
@@ -41,12 +38,13 @@ public class ListingService {
     public Optional<Listing> getListingById(UUID id) {
         return listingRepository.findById(id);
     }
-<<<<<<< HEAD
 
     public Listing updateListing(UUID id, Listing updatedListing) {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
+
         validateListingForUpdate(existing);
+
         existing.setTitle(updatedListing.getTitle());
         existing.setDescription(updatedListing.getDescription());
         existing.setImageUrl(updatedListing.getImageUrl());
@@ -81,6 +79,3 @@ public class ListingService {
         listingRepository.delete(existing);
     }
 }
-=======
-}
->>>>>>> fc34526131289a15b36342d2f466742abbfa05a8
