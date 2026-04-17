@@ -1,5 +1,9 @@
 package com.example.bidmart.wallet.service;
 
+import com.example.bidmart.wallet.exception.InsufficientBalanceException;
+import com.example.bidmart.wallet.exception.InvalidAmountException;
+import com.example.bidmart.wallet.exception.WalletAlreadyExistsException;
+import com.example.bidmart.wallet.exception.WalletNotFoundException;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.repository.TransactionRepository;
@@ -121,7 +125,7 @@ class WalletServiceTest {
     }
 
     @Test
-    void topUp_walletNotFound_returnsNull() {
+    void topUp_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
         Wallet result = walletService.topUp(userId, new BigDecimal("10000"));

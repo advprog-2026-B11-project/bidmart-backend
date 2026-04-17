@@ -1,5 +1,9 @@
 package com.example.bidmart.wallet.service;
 
+import com.example.bidmart.wallet.exception.InsufficientBalanceException;
+import com.example.bidmart.wallet.exception.InvalidAmountException;
+import com.example.bidmart.wallet.exception.WalletAlreadyExistsException;
+import com.example.bidmart.wallet.exception.WalletNotFoundException;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.repository.TransactionRepository;
@@ -24,7 +28,7 @@ public class WalletService {
 
     public Wallet createWallet(UUID userId) {
         if (walletRepository.findByUserId(userId).isPresent()) {
-            return null;
+            throw new WalletAlreadyExistsException("Wallet sudah ada untuk user ini.");
         }
 
         Wallet wallet = new Wallet(userId);
@@ -32,19 +36,16 @@ public class WalletService {
     }
 
     public Wallet getWalletByUserId(UUID userId) {
-        return walletRepository.findByUserId(userId).orElse(null);
+        return walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
     }
 
     @Transactional
     public Wallet topUp(UUID userId, BigDecimal amount) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
+        validateAmount(amount);
 
-        Wallet wallet = walletRepository.findByUserId(userId).orElse(null);
-        if (wallet == null) {
-            return null;
-        }
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
 
         wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(amount));
         wallet = walletRepository.save(wallet);
@@ -60,14 +61,10 @@ public class WalletService {
 
     @Transactional
     public Wallet reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal reserveTarget) {
-        if (reserveTarget == null || reserveTarget.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
+        validateAmount(reserveTarget);
 
-        Wallet wallet = walletRepository.findByUserId(buyerId).orElse(null);
-        if (wallet == null) {
-            return null;
-        }
+        Wallet wallet = walletRepository.findByUserId(buyerId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
 
         String refId = listingId.toString();
 
@@ -80,7 +77,8 @@ public class WalletService {
         BigDecimal additionalLock = reserveTarget.subtract(currentlyHeld);
 
         if (wallet.getBalanceAvailable().compareTo(additionalLock) < 0) {
-            return null;
+            throw new InsufficientBalanceException(
+                    "Saldo tidak mencukupi. Dibutuhkan: " + additionalLock + ", tersedia: " + wallet.getBalanceAvailable());
         }
 
         wallet.setBalanceAvailable(wallet.getBalanceAvailable().subtract(additionalLock));
@@ -94,14 +92,10 @@ public class WalletService {
 
     @Transactional
     public Wallet releaseBidFunds(UUID buyerId, UUID listingId, BigDecimal releaseAmount) {
-        if (releaseAmount == null || releaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
+        validateAmount(releaseAmount);
 
-        Wallet wallet = walletRepository.findByUserId(buyerId).orElse(null);
-        if (wallet == null) {
-            return null;
-        }
+        Wallet wallet = walletRepository.findByUserId(buyerId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
 
         String refId = listingId.toString();
 
@@ -123,17 +117,14 @@ public class WalletService {
 
     @Transactional
     public Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
+        validateAmount(amount);
 
-        Wallet wallet = walletRepository.findByUserId(userId).orElse(null);
-        if (wallet == null) {
-            return null;
-        }
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
 
         if (wallet.getBalanceLocked().compareTo(amount) < 0) {
-            return null;
+            throw new InsufficientBalanceException(
+                    "Saldo terkunci tidak mencukupi. Dibutuhkan: " + amount + ", terkunci: " + wallet.getBalanceLocked());
         }
 
         wallet.setBalanceLocked(wallet.getBalanceLocked().subtract(amount));
@@ -146,17 +137,14 @@ public class WalletService {
 
     @Transactional
     public Wallet withdraw(UUID userId, BigDecimal amount) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
+        validateAmount(amount);
 
-        Wallet wallet = walletRepository.findByUserId(userId).orElse(null);
-        if (wallet == null) {
-            return null;
-        }
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
 
         if (wallet.getBalanceAvailable().compareTo(amount) < 0) {
-            return null;
+            throw new InsufficientBalanceException(
+                    "Saldo tidak mencukupi. Dibutuhkan: " + amount + ", tersedia: " + wallet.getBalanceAvailable());
         }
 
         wallet.setBalanceAvailable(wallet.getBalanceAvailable().subtract(amount));
@@ -168,23 +156,18 @@ public class WalletService {
     }
 
     public List<Transaction> getTransactionHistory(UUID userId) {
-        Wallet wallet = walletRepository.findByUserId(userId).orElse(null);
-        if (wallet == null) {
-            return null;
-        }
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
+
         return transactionRepository.findByWalletIdOrderByCreatedAtDesc(wallet.getId());
     }
 
     @Transactional
     public Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return null;
-        }
+        validateAmount(amount);
 
-        Wallet sellerWallet = walletRepository.findByUserId(sellerId).orElse(null);
-        if (sellerWallet == null) {
-            return null;
-        }
+        Wallet sellerWallet = walletRepository.findByUserId(sellerId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet seller tidak ditemukan."));
 
         sellerWallet.setBalanceAvailable(sellerWallet.getBalanceAvailable().add(amount));
         sellerWallet = walletRepository.save(sellerWallet);
@@ -192,6 +175,12 @@ public class WalletService {
         transactionRepository.save(new Transaction(sellerWallet.getId(), "INCOME", amount, referenceId));
 
         return sellerWallet;
+    }
+
+    private void validateAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidAmountException("Jumlah harus lebih dari 0.");
+        }
     }
 
     private BigDecimal calculateHeldForReference(UUID walletId, String referenceId) {
