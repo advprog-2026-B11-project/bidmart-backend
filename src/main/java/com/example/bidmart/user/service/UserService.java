@@ -8,4 +8,5 @@ public interface UserService {
     UserProfileResponse getCurrentUser(String username);
     UserProfileResponse updateProfile(String username, UpdateProfileRequest request);
     void deleteProfile(String username);
+    UUID getUserIdByUsername(String username);
 }
