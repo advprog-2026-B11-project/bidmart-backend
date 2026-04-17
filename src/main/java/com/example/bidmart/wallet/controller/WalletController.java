@@ -1,6 +1,5 @@
 package com.example.bidmart.wallet.controller;
 
-import com.example.bidmart.user.service.UserService;
 import com.example.bidmart.wallet.dto.*;
 import com.example.bidmart.wallet.exception.UnauthorizedException;
 import com.example.bidmart.wallet.model.Transaction;
@@ -13,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -49,7 +49,7 @@ public class WalletController {
             Authentication authentication
     ) {
         ensureCurrentUser(userId, authentication);
-        return getMyBalance(authentication);
+        return getBalance(authentication);
     }
 
     @PostMapping("/{userId}/top-up")
@@ -126,13 +126,6 @@ public class WalletController {
         return userRepository.findByUsername(username)
                 .map(User::getId)
                 .orElseThrow(() -> new UnauthorizedException("User tidak ditemukan."));
-    }
-
-    private UUID resolveCurrentUserId(Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User belum terautentikasi.");
-        }
-        return userService.getUserIdByUsername(authentication.getName());
     }
 
     private void ensureCurrentUser(UUID userId, Authentication authentication) {
