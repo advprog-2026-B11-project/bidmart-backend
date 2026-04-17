@@ -2,6 +2,7 @@ package com.example.bidmart.listing.service;
 
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
+import com.example.bidmart.bidding.service.ListingSnapshot;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -29,5 +30,34 @@ public class ListingService {
 
     public Optional<Listing> getListingById(UUID id) {
         return listingRepository.findById(id);
+    }
+
+    public Listing updateListing(UUID id, Listing updatedListing) {
+        Listing existing = listingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
+        validateListingForUpdate(existing);
+        existing.setTitle(updatedListing.getTitle());
+        existing.setDescription(updatedListing.getDescription());
+        existing.setImageUrl(updatedListing.getImageUrl());
+        existing.setStartingPrice(updatedListing.getStartingPrice());
+        existing.setReservePrice(updatedListing.getReservePrice());
+        existing.setEndTime(updatedListing.getEndTime());
+        existing.setStatus(updatedListing.getStatus());
+
+        return listingRepository.save(existing);
+    }
+
+    private void validateListingForUpdate(Listing listing) {
+        ListingSnapshot snapshot = new ListingSnapshot(
+                listing.getId(),
+                listing.getSellerId(),
+                listing.getStartingPrice(),
+                listing.getEndTime(),
+                listing.getStatus()
+        );
+
+        if (snapshot.isOpenAt(LocalDateTime.now())) {
+            throw new RuntimeException("Listing tidak bisa diupdate saat auction masih aktif.");
+        }
     }
 }

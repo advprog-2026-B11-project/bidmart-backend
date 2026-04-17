@@ -32,8 +32,13 @@ public class ListingController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Listing> getListingById(@PathVariable UUID id) {
-        return listingService.getListingById(id)
-                .map(ResponseEntity::ok)
+        return listingService.getListingById(id).map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Listing> updateListing(@PathVariable UUID id, @RequestBody Listing listing) {
+        Listing updated = listingService.updateListing(id, listing);
+        return ResponseEntity.ok(updated);
     }
 }
