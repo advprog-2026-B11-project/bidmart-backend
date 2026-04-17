@@ -1,5 +1,9 @@
 package com.example.bidmart.wallet.service;
 
+import com.example.bidmart.wallet.exception.InsufficientBalanceException;
+import com.example.bidmart.wallet.exception.InvalidAmountException;
+import com.example.bidmart.wallet.exception.WalletAlreadyExistsException;
+import com.example.bidmart.wallet.exception.WalletNotFoundException;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.repository.TransactionRepository;
@@ -59,11 +63,10 @@ class WalletServiceTest {
     }
 
     @Test
-    void createWallet_alreadyExists_returnsNull() {
-        when(walletRepository.findByUserId(userId))
-                .thenReturn(Optional.of(wallet));
+    void createWallet_alreadyExists_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
 
-        assertNull(walletService.createWallet(userId));
+        assertThrows(WalletAlreadyExistsException.class, () -> walletService.createWallet(userId));
         verify(walletRepository, never()).save(any());
     }
 
@@ -80,9 +83,10 @@ class WalletServiceTest {
     }
 
     @Test
-    void getWalletByUserId_notFound() {
+    void getWalletByUserId_notFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
-        assertNull(walletService.getWalletByUserId(userId));
+
+        assertThrows(WalletNotFoundException.class, () -> walletService.getWalletByUserId(userId));
     }
 
     // === topUp ===
@@ -101,25 +105,26 @@ class WalletServiceTest {
     }
 
     @Test
-    void topUp_zeroAmount_returnsNull() {
-        assertNull(walletService.topUp(userId, BigDecimal.ZERO));
+    void topUp_zeroAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, BigDecimal.ZERO));
         verify(walletRepository, never()).save(any());
     }
 
     @Test
-    void topUp_negativeAmount_returnsNull() {
-        assertNull(walletService.topUp(userId, new BigDecimal("-100")));
+    void topUp_negativeAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, new BigDecimal("-100")));
     }
 
     @Test
-    void topUp_nullAmount_returnsNull() {
-        assertNull(walletService.topUp(userId, null));
+    void topUp_nullAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, null));
     }
 
     @Test
-    void topUp_walletNotFound_returnsNull() {
+    void topUp_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
-        assertNull(walletService.topUp(userId, new BigDecimal("10000")));
+
+        assertThrows(WalletNotFoundException.class, () -> walletService.topUp(userId, new BigDecimal("10000")));
     }
 
     // === reserveBidFunds ===
@@ -172,25 +177,30 @@ class WalletServiceTest {
     }
 
     @Test
-    void reserveBidFunds_insufficientBalance_returnsNull() {
+    void reserveBidFunds_insufficientBalance_throwsException() {
         UUID listingId = UUID.randomUUID();
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
         when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of());
 
-        assertNull(walletService.reserveBidFunds(userId, listingId, new BigDecimal("200000")));
+        assertThrows(InsufficientBalanceException.class,
+                () -> walletService.reserveBidFunds(userId, listingId, new BigDecimal("200000")));
         verify(walletRepository, never()).save(any());
     }
 
     @Test
-    void reserveBidFunds_walletNotFound_returnsNull() {
+    void reserveBidFunds_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
-        assertNull(walletService.reserveBidFunds(userId, UUID.randomUUID(), new BigDecimal("10000")));
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.reserveBidFunds(userId, UUID.randomUUID(), new BigDecimal("10000")));
     }
 
     @Test
-    void reserveBidFunds_invalidAmount_returnsNull() {
-        assertNull(walletService.reserveBidFunds(userId, UUID.randomUUID(), BigDecimal.ZERO));
-        assertNull(walletService.reserveBidFunds(userId, UUID.randomUUID(), null));
+    void reserveBidFunds_invalidAmount_throwsException() {
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.reserveBidFunds(userId, UUID.randomUUID(), BigDecimal.ZERO));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.reserveBidFunds(userId, UUID.randomUUID(), null));
     }
 
     // === releaseBidFunds ===
@@ -246,15 +256,19 @@ class WalletServiceTest {
     }
 
     @Test
-    void releaseBidFunds_walletNotFound_returnsNull() {
+    void releaseBidFunds_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
-        assertNull(walletService.releaseBidFunds(userId, UUID.randomUUID(), new BigDecimal("10000")));
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.releaseBidFunds(userId, UUID.randomUUID(), new BigDecimal("10000")));
     }
 
     @Test
-    void releaseBidFunds_invalidAmount_returnsNull() {
-        assertNull(walletService.releaseBidFunds(userId, UUID.randomUUID(), BigDecimal.ZERO));
-        assertNull(walletService.releaseBidFunds(userId, UUID.randomUUID(), null));
+    void releaseBidFunds_invalidAmount_throwsException() {
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.releaseBidFunds(userId, UUID.randomUUID(), BigDecimal.ZERO));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.releaseBidFunds(userId, UUID.randomUUID(), null));
     }
 
     // === settlePayment ===
@@ -277,17 +291,20 @@ class WalletServiceTest {
     }
 
     @Test
-    void settlePayment_insufficientLocked_returnsNull() {
+    void settlePayment_insufficientLocked_throwsException() {
         wallet.setBalanceLocked(new BigDecimal("10000"));
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
 
-        assertNull(walletService.settlePayment(userId, new BigDecimal("50000"), "bid-123"));
+        assertThrows(InsufficientBalanceException.class,
+                () -> walletService.settlePayment(userId, new BigDecimal("50000"), "bid-123"));
     }
 
     @Test
-    void settlePayment_walletNotFound_returnsNull() {
+    void settlePayment_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
-        assertNull(walletService.settlePayment(userId, new BigDecimal("10000"), "bid-123"));
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.settlePayment(userId, new BigDecimal("10000"), "bid-123"));
     }
 
     // === withdraw ===
@@ -306,23 +323,26 @@ class WalletServiceTest {
     }
 
     @Test
-    void withdraw_insufficientBalance_returnsNull() {
+    void withdraw_insufficientBalance_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
 
-        assertNull(walletService.withdraw(userId, new BigDecimal("200000")));
+        assertThrows(InsufficientBalanceException.class,
+                () -> walletService.withdraw(userId, new BigDecimal("200000")));
         verify(walletRepository, never()).save(any());
     }
 
     @Test
-    void withdraw_walletNotFound_returnsNull() {
+    void withdraw_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
-        assertNull(walletService.withdraw(userId, new BigDecimal("10000")));
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.withdraw(userId, new BigDecimal("10000")));
     }
 
     @Test
-    void withdraw_invalidAmount_returnsNull() {
-        assertNull(walletService.withdraw(userId, BigDecimal.ZERO));
-        assertNull(walletService.withdraw(userId, null));
+    void withdraw_invalidAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.withdraw(userId, BigDecimal.ZERO));
+        assertThrows(InvalidAmountException.class, () -> walletService.withdraw(userId, null));
     }
 
     // === getTransactionHistory ===
@@ -342,9 +362,10 @@ class WalletServiceTest {
     }
 
     @Test
-    void getTransactionHistory_walletNotFound_returnsNull() {
+    void getTransactionHistory_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
-        assertNull(walletService.getTransactionHistory(userId));
+
+        assertThrows(WalletNotFoundException.class, () -> walletService.getTransactionHistory(userId));
     }
 
     @Test
@@ -378,20 +399,24 @@ class WalletServiceTest {
     }
 
     @Test
-    void confirmDelivery_sellerWalletNotFound_returnsNull() {
+    void confirmDelivery_sellerWalletNotFound_throwsException() {
         UUID sellerId = UUID.randomUUID();
         when(walletRepository.findByUserId(sellerId)).thenReturn(Optional.empty());
 
-        assertNull(walletService.confirmDelivery(sellerId, new BigDecimal("30000"), "listing-123"));
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.confirmDelivery(sellerId, new BigDecimal("30000"), "listing-123"));
         verify(walletRepository, never()).save(any());
     }
 
     @Test
-    void confirmDelivery_invalidAmount_returnsNull() {
+    void confirmDelivery_invalidAmount_throwsException() {
         UUID sellerId = UUID.randomUUID();
 
-        assertNull(walletService.confirmDelivery(sellerId, BigDecimal.ZERO, "listing-123"));
-        assertNull(walletService.confirmDelivery(sellerId, null, "listing-123"));
-        assertNull(walletService.confirmDelivery(sellerId, new BigDecimal("-100"), "listing-123"));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.confirmDelivery(sellerId, BigDecimal.ZERO, "listing-123"));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.confirmDelivery(sellerId, null, "listing-123"));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.confirmDelivery(sellerId, new BigDecimal("-100"), "listing-123"));
     }
 }
