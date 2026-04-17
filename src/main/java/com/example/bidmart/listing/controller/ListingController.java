@@ -38,9 +38,13 @@ public class ListingController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Listing> updateListing(@PathVariable UUID id, @RequestBody Listing listing) {
-        Listing updated = listingService.updateListing(id, listing);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<?> updateListing(@PathVariable UUID id, @RequestBody Listing listing) {
+        try {
+            Listing updated = listingService.updateListing(id, listing);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")
