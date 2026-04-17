@@ -2,6 +2,7 @@ package com.example.bidmart.user.service;
 
 import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
+import com.example.bidmart.user.dto.MfaVerificationRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.Session;
@@ -25,17 +26,20 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final SessionService sessionService;
+    private final MfaService mfaService;
 
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
                             PasswordEncoder passwordEncoder,
                             JwtService jwtService,
-                            SessionService sessionService) {
+                            SessionService sessionService,
+                            MfaService mfaService) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.sessionService = sessionService;
+        this.mfaService = mfaService;
     }
 
     @Override
@@ -68,14 +72,29 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Invalid password.");
         }
 
-        sessionService.enforceSessionLimit(user, 3);
+        if (user.isMfaEnabled()){
+            String tempToken = jwtService.generateTempToken(user);
+            return AuthResponse.builder().mfaRequired(true).tempToken(tempToken).build();
+        }
 
-        String accessToken = jwtService.generateAccessToken(user);
-        String refreshToken = jwtService.generateRefreshToken(user);
+        return finalizeLogin(user, "Default Device");
+    }
+    @Override
+    @Transactional
+    public AuthResponse verifyMfaLogin(MfaVerificationRequest request){
+        String username = jwtService.extractUsername(request.getTempToken());
+        User user = userRepository.findByUsername(username).orElseThrow(() -> IllegalArgumentException("User not found."));
+        if (!mfaService.verifyCode(user.getMfaSecret(), request.getCode())){
+            throw new IllegalArgumentException("Invalid 2FA Code.");
+        }
 
-        sessionService.createSession(user, refreshToken, deviceInfo);
+        return 
+    }
 
-        return mapToAuthResponse(user, accessToken, refreshToken);
+    @Override
+    @Transactional
+    public AuthResponse finalizeLogin(User user, String deviceInfo){
+
     }
 
     @Override
