@@ -197,4 +197,28 @@ class WalletControllerTest {
         assertEquals(HttpStatus.NOT_FOUND,
                 walletController.getTransactionHistory(userId).getStatusCode());
     }
+
+    @Test
+    void confirmDelivery_success() {
+        UUID sellerId = UUID.randomUUID();
+        Wallet sellerWallet = new Wallet(sellerId);
+        sellerWallet.setBalanceAvailable(new BigDecimal("80000"));
+
+        when(walletService.confirmDelivery(eq(sellerId), any(), any())).thenReturn(sellerWallet);
+
+        ConfirmDeliveryRequest request = new ConfirmDeliveryRequest(sellerId, new BigDecimal("30000"), listingId);
+        ResponseEntity<Wallet> response = walletController.confirmDelivery(request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(new BigDecimal("80000"), response.getBody().getBalanceAvailable());
+    }
+
+    @Test
+    void confirmDelivery_badRequest() {
+        when(walletService.confirmDelivery(any(), any(), any())).thenReturn(null);
+
+        ConfirmDeliveryRequest request = new ConfirmDeliveryRequest(UUID.randomUUID(), new BigDecimal("30000"), listingId);
+
+        assertEquals(HttpStatus.BAD_REQUEST, walletController.confirmDelivery(request).getStatusCode());
+    }
 }

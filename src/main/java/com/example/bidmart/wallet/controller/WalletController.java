@@ -108,4 +108,15 @@ public class WalletController {
         }
         return ResponseEntity.ok(transactions);
     }
+
+    @PostMapping("/confirm-delivery")
+    public ResponseEntity<Wallet> confirmDelivery(@RequestBody ConfirmDeliveryRequest request) {
+        Wallet wallet = walletService.confirmDelivery(
+            request.getSellerId(), request.getAmount(), request.getListingId().toString());
+
+        if (wallet == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(wallet);
+    }
 }

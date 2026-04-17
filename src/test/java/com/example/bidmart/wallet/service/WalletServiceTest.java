@@ -358,4 +358,40 @@ class WalletServiceTest {
         assertNotNull(result);
         assertTrue(result.isEmpty());
     }
+
+    // === confirmDelivery ===
+
+    @Test
+    void confirmDelivery_success_creditsSellerWallet() {
+        UUID sellerId = UUID.randomUUID();
+        Wallet sellerWallet = new Wallet(sellerId);
+        sellerWallet.setBalanceAvailable(new BigDecimal("50000"));
+
+        when(walletRepository.findByUserId(sellerId)).thenReturn(Optional.of(sellerWallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Wallet result = walletService.confirmDelivery(sellerId, new BigDecimal("30000"), "listing-123");
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("80000"), result.getBalanceAvailable());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void confirmDelivery_sellerWalletNotFound_returnsNull() {
+        UUID sellerId = UUID.randomUUID();
+        when(walletRepository.findByUserId(sellerId)).thenReturn(Optional.empty());
+
+        assertNull(walletService.confirmDelivery(sellerId, new BigDecimal("30000"), "listing-123"));
+        verify(walletRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmDelivery_invalidAmount_returnsNull() {
+        UUID sellerId = UUID.randomUUID();
+
+        assertNull(walletService.confirmDelivery(sellerId, BigDecimal.ZERO, "listing-123"));
+        assertNull(walletService.confirmDelivery(sellerId, null, "listing-123"));
+        assertNull(walletService.confirmDelivery(sellerId, new BigDecimal("-100"), "listing-123"));
+    }
 }

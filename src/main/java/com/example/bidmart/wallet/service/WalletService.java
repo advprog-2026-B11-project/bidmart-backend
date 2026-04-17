@@ -175,6 +175,25 @@ public class WalletService {
         return transactionRepository.findByWalletIdOrderByCreatedAtDesc(wallet.getId());
     }
 
+    @Transactional
+    public Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+
+        Wallet sellerWallet = walletRepository.findByUserId(sellerId).orElse(null);
+        if (sellerWallet == null) {
+            return null;
+        }
+
+        sellerWallet.setBalanceAvailable(sellerWallet.getBalanceAvailable().add(amount));
+        sellerWallet = walletRepository.save(sellerWallet);
+
+        transactionRepository.save(new Transaction(sellerWallet.getId(), "INCOME", amount, referenceId));
+
+        return sellerWallet;
+    }
+
     private BigDecimal calculateHeldForReference(UUID walletId, String referenceId) {
         List<Transaction> txs = transactionRepository.findByWalletIdAndReferenceId(walletId, referenceId);
 
