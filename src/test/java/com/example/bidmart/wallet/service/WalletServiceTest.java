@@ -1,6 +1,12 @@
 package com.example.bidmart.wallet.service;
 
+import com.example.bidmart.wallet.exception.InsufficientBalanceException;
+import com.example.bidmart.wallet.exception.InvalidAmountException;
+import com.example.bidmart.wallet.exception.WalletAlreadyExistsException;
+import com.example.bidmart.wallet.exception.WalletNotFoundException;
+import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
+import com.example.bidmart.wallet.repository.TransactionRepository;
 import com.example.bidmart.wallet.repository.WalletRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,14 +30,21 @@ class WalletServiceTest {
     @Mock
     private WalletRepository walletRepository;
 
+    @Mock
+    private TransactionRepository transactionRepository;
+
     @InjectMocks
     private WalletService walletService;
 
     private UUID userId;
+    private Wallet wallet;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        wallet = new Wallet(userId);
+        wallet.setBalanceAvailable(new BigDecimal("100000"));
+        wallet.setBalanceLocked(BigDecimal.ZERO);
     }
 
     // === createWallet ===
@@ -39,33 +53,27 @@ class WalletServiceTest {
     void createWallet_success() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
         when(walletRepository.save(any(Wallet.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(inv -> inv.getArgument(0));
 
         Wallet result = walletService.createWallet(userId);
 
         assertNotNull(result);
         assertEquals(userId, result.getUserId());
-        assertEquals(BigDecimal.ZERO, result.getBalanceAvailable());
-        assertEquals(BigDecimal.ZERO, result.getBalanceLocked());
         verify(walletRepository).save(any(Wallet.class));
     }
 
     @Test
-    void createWallet_alreadyExists_returnsNull() {
-        when(walletRepository.findByUserId(userId))
-                .thenReturn(Optional.of(new Wallet(userId)));
+    void createWallet_alreadyExists_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
 
-        Wallet result = walletService.createWallet(userId);
-
-        assertNull(result);
-        verify(walletRepository, never()).save(any(Wallet.class));
+        assertThrows(WalletAlreadyExistsException.class, () -> walletService.createWallet(userId));
+        verify(walletRepository, never()).save(any());
     }
 
     // === getWalletByUserId ===
 
     @Test
     void getWalletByUserId_found() {
-        Wallet wallet = new Wallet(userId);
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
 
         Wallet result = walletService.getWalletByUserId(userId);
@@ -75,59 +83,340 @@ class WalletServiceTest {
     }
 
     @Test
-    void getWalletByUserId_notFound_returnsNull() {
+    void getWalletByUserId_notFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
-        Wallet result = walletService.getWalletByUserId(userId);
-
-        assertNull(result);
+        assertThrows(WalletNotFoundException.class, () -> walletService.getWalletByUserId(userId));
     }
 
     // === topUp ===
 
     @Test
-    void topUp_success() {
-        Wallet wallet = new Wallet(userId);
-        BigDecimal amount = new BigDecimal("50000");
-
+    void topUp_success_recordsTransaction() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
         when(walletRepository.save(any(Wallet.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(inv -> inv.getArgument(0));
 
-        Wallet result = walletService.topUp(userId, amount);
+        Wallet result = walletService.topUp(userId, new BigDecimal("50000"));
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("150000"), result.getBalanceAvailable());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void topUp_zeroAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, BigDecimal.ZERO));
+        verify(walletRepository, never()).save(any());
+    }
+
+    @Test
+    void topUp_negativeAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, new BigDecimal("-100")));
+    }
+
+    @Test
+    void topUp_nullAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, null));
+    }
+
+    @Test
+    void topUp_walletNotFound_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThrows(WalletNotFoundException.class, () -> walletService.topUp(userId, new BigDecimal("10000")));
+    }
+
+    // === reserveBidFunds ===
+
+    @Test
+    void reserveBidFunds_freshHold_success() {
+        UUID listingId = UUID.randomUUID();
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of());
+
+        Wallet result = walletService.reserveBidFunds(userId, listingId, new BigDecimal("30000"));
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("70000"), result.getBalanceAvailable());
+        assertEquals(new BigDecimal("30000"), result.getBalanceLocked());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void reserveBidFunds_incrementalHold_onlyLocksAdditional() {
+        UUID listingId = UUID.randomUUID();
+        wallet.setBalanceAvailable(new BigDecimal("70000"));
+        wallet.setBalanceLocked(new BigDecimal("30000"));
+
+        Transaction prevHold = new Transaction(wallet.getId(), "HOLD", new BigDecimal("30000"), listingId.toString());
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of(prevHold));
+
+        Wallet result = walletService.reserveBidFunds(userId, listingId, new BigDecimal("50000"));
 
         assertNotNull(result);
         assertEquals(new BigDecimal("50000"), result.getBalanceAvailable());
-        verify(walletRepository).save(any(Wallet.class));
+        assertEquals(new BigDecimal("50000"), result.getBalanceLocked());
     }
 
     @Test
-    void topUp_zeroAmount_returnsNull() {
-        Wallet result = walletService.topUp(userId, BigDecimal.ZERO);
-        assertNull(result);
-        verify(walletRepository, never()).save(any(Wallet.class));
+    void reserveBidFunds_targetAlreadyMet_noAdditionalLock() {
+        UUID listingId = UUID.randomUUID();
+
+        Transaction prevHold = new Transaction(wallet.getId(), "HOLD", new BigDecimal("50000"), listingId.toString());
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of(prevHold));
+
+        Wallet result = walletService.reserveBidFunds(userId, listingId, new BigDecimal("30000"));
+
+        assertNotNull(result);
+        verify(walletRepository, never()).save(any());
     }
 
     @Test
-    void topUp_negativeAmount_returnsNull() {
-        Wallet result = walletService.topUp(userId, new BigDecimal("-100"));
-        assertNull(result);
-        verify(walletRepository, never()).save(any(Wallet.class));
+    void reserveBidFunds_insufficientBalance_throwsException() {
+        UUID listingId = UUID.randomUUID();
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of());
+
+        assertThrows(InsufficientBalanceException.class,
+                () -> walletService.reserveBidFunds(userId, listingId, new BigDecimal("200000")));
+        verify(walletRepository, never()).save(any());
     }
 
     @Test
-    void topUp_nullAmount_returnsNull() {
-        Wallet result = walletService.topUp(userId, null);
-        assertNull(result);
-    }
-
-    @Test
-    void topUp_walletNotFound_returnsNull() {
+    void reserveBidFunds_walletNotFound_throwsException() {
         when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
-        Wallet result = walletService.topUp(userId, new BigDecimal("10000"));
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.reserveBidFunds(userId, UUID.randomUUID(), new BigDecimal("10000")));
+    }
 
-        assertNull(result);
-        verify(walletRepository, never()).save(any(Wallet.class));
+    @Test
+    void reserveBidFunds_invalidAmount_throwsException() {
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.reserveBidFunds(userId, UUID.randomUUID(), BigDecimal.ZERO));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.reserveBidFunds(userId, UUID.randomUUID(), null));
+    }
+
+    // === releaseBidFunds ===
+
+    @Test
+    void releaseBidFunds_success_releasesHeldAmount() {
+        UUID listingId = UUID.randomUUID();
+        wallet.setBalanceAvailable(new BigDecimal("70000"));
+        wallet.setBalanceLocked(new BigDecimal("30000"));
+
+        Transaction prevHold = new Transaction(wallet.getId(), "HOLD", new BigDecimal("30000"), listingId.toString());
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of(prevHold));
+
+        Wallet result = walletService.releaseBidFunds(userId, listingId, new BigDecimal("30000"));
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("100000"), result.getBalanceAvailable());
+        assertEquals(BigDecimal.ZERO, result.getBalanceLocked());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void releaseBidFunds_capsAtCurrentlyHeld() {
+        UUID listingId = UUID.randomUUID();
+        wallet.setBalanceAvailable(new BigDecimal("70000"));
+        wallet.setBalanceLocked(new BigDecimal("30000"));
+
+        Transaction prevHold = new Transaction(wallet.getId(), "HOLD", new BigDecimal("30000"), listingId.toString());
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of(prevHold));
+
+        Wallet result = walletService.releaseBidFunds(userId, listingId, new BigDecimal("99999"));
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("100000"), result.getBalanceAvailable());
+        assertEquals(BigDecimal.ZERO, result.getBalanceLocked());
+    }
+
+    @Test
+    void releaseBidFunds_nothingHeld_returnsWalletUnchanged() {
+        UUID listingId = UUID.randomUUID();
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of());
+
+        Wallet result = walletService.releaseBidFunds(userId, listingId, new BigDecimal("30000"));
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("100000"), result.getBalanceAvailable());
+        verify(walletRepository, never()).save(any());
+    }
+
+    @Test
+    void releaseBidFunds_walletNotFound_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.releaseBidFunds(userId, UUID.randomUUID(), new BigDecimal("10000")));
+    }
+
+    @Test
+    void releaseBidFunds_invalidAmount_throwsException() {
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.releaseBidFunds(userId, UUID.randomUUID(), BigDecimal.ZERO));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.releaseBidFunds(userId, UUID.randomUUID(), null));
+    }
+
+    // === settlePayment ===
+
+    @Test
+    void settlePayment_success() {
+        wallet.setBalanceAvailable(new BigDecimal("70000"));
+        wallet.setBalanceLocked(new BigDecimal("30000"));
+
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        Wallet result = walletService.settlePayment(userId, new BigDecimal("30000"), "bid-123");
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("70000"), result.getBalanceAvailable());
+        assertEquals(BigDecimal.ZERO, result.getBalanceLocked());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void settlePayment_insufficientLocked_throwsException() {
+        wallet.setBalanceLocked(new BigDecimal("10000"));
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+
+        assertThrows(InsufficientBalanceException.class,
+                () -> walletService.settlePayment(userId, new BigDecimal("50000"), "bid-123"));
+    }
+
+    @Test
+    void settlePayment_walletNotFound_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.settlePayment(userId, new BigDecimal("10000"), "bid-123"));
+    }
+
+    // === withdraw ===
+
+    @Test
+    void withdraw_success() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        Wallet result = walletService.withdraw(userId, new BigDecimal("40000"));
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("60000"), result.getBalanceAvailable());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void withdraw_insufficientBalance_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+
+        assertThrows(InsufficientBalanceException.class,
+                () -> walletService.withdraw(userId, new BigDecimal("200000")));
+        verify(walletRepository, never()).save(any());
+    }
+
+    @Test
+    void withdraw_walletNotFound_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.withdraw(userId, new BigDecimal("10000")));
+    }
+
+    @Test
+    void withdraw_invalidAmount_throwsException() {
+        assertThrows(InvalidAmountException.class, () -> walletService.withdraw(userId, BigDecimal.ZERO));
+        assertThrows(InvalidAmountException.class, () -> walletService.withdraw(userId, null));
+    }
+
+    // === getTransactionHistory ===
+
+    @Test
+    void getTransactionHistory_success() {
+        Transaction tx = new Transaction(wallet.getId(), "TOPUP", new BigDecimal("50000"), null);
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(transactionRepository.findByWalletIdOrderByCreatedAtDesc(any()))
+                .thenReturn(List.of(tx));
+
+        List<Transaction> result = walletService.getTransactionHistory(userId);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("TOPUP", result.get(0).getType());
+    }
+
+    @Test
+    void getTransactionHistory_walletNotFound_throwsException() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThrows(WalletNotFoundException.class, () -> walletService.getTransactionHistory(userId));
+    }
+
+    @Test
+    void getTransactionHistory_emptyList() {
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(transactionRepository.findByWalletIdOrderByCreatedAtDesc(any()))
+                .thenReturn(List.of());
+
+        List<Transaction> result = walletService.getTransactionHistory(userId);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    // === confirmDelivery ===
+
+    @Test
+    void confirmDelivery_success_creditsSellerWallet() {
+        UUID sellerId = UUID.randomUUID();
+        Wallet sellerWallet = new Wallet(sellerId);
+        sellerWallet.setBalanceAvailable(new BigDecimal("50000"));
+
+        when(walletRepository.findByUserId(sellerId)).thenReturn(Optional.of(sellerWallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Wallet result = walletService.confirmDelivery(sellerId, new BigDecimal("30000"), "listing-123");
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("80000"), result.getBalanceAvailable());
+        verify(transactionRepository).save(any(Transaction.class));
+    }
+
+    @Test
+    void confirmDelivery_sellerWalletNotFound_throwsException() {
+        UUID sellerId = UUID.randomUUID();
+        when(walletRepository.findByUserId(sellerId)).thenReturn(Optional.empty());
+
+        assertThrows(WalletNotFoundException.class,
+                () -> walletService.confirmDelivery(sellerId, new BigDecimal("30000"), "listing-123"));
+        verify(walletRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmDelivery_invalidAmount_throwsException() {
+        UUID sellerId = UUID.randomUUID();
+
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.confirmDelivery(sellerId, BigDecimal.ZERO, "listing-123"));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.confirmDelivery(sellerId, null, "listing-123"));
+        assertThrows(InvalidAmountException.class,
+                () -> walletService.confirmDelivery(sellerId, new BigDecimal("-100"), "listing-123"));
     }
 }
