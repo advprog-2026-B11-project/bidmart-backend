@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,10 +43,29 @@ public class WalletController {
         return ResponseEntity.ok(wallet);
     }
 
-    @PostMapping("/top-up")
-    public ResponseEntity<Wallet> topUp(Authentication authentication, @RequestBody TopUpRequest request) {
-        UUID userId = resolveCurrentUserId(authentication);
-        Wallet wallet = walletService.topUp(userId, request.getAmount());
+    @GetMapping("/{userId}/balance")
+    public ResponseEntity<Wallet> getBalance(
+            @PathVariable UUID userId,
+            Authentication authentication
+    ) {
+        ensureCurrentUser(userId, authentication);
+        return getBalance(authentication);
+    }
+
+    @PostMapping("/{userId}/top-up")
+    public ResponseEntity<Wallet> topUp(
+            @PathVariable UUID userId,
+            @RequestBody TopUpRequest request,
+            Authentication authentication
+    ) {
+        ensureCurrentUser(userId, authentication);
+        UUID authenticatedUserId = resolveCurrentUserId(authentication);
+        Wallet wallet = walletService.topUp(authenticatedUserId, request.getAmount());
+
+        if (wallet == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
         return ResponseEntity.ok(wallet);
     }
 
@@ -106,5 +126,12 @@ public class WalletController {
         return userRepository.findByUsername(username)
                 .map(User::getId)
                 .orElseThrow(() -> new UnauthorizedException("User tidak ditemukan."));
+    }
+
+    private void ensureCurrentUser(UUID userId, Authentication authentication) {
+        UUID authenticatedUserId = resolveCurrentUserId(authentication);
+        if (!authenticatedUserId.equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Akses ditolak.");
+        }
     }
 }
