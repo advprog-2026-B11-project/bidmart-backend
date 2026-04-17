@@ -25,16 +25,13 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserProfileResponse getCurrentUser(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
-        return mapToProfileResponse(user);
+        return mapToProfileResponse(findByUsername(username));
     }
 
     @Override
     @Transactional
     public UserProfileResponse updateProfile(String username, UpdateProfileRequest request) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        User user = findByUsername(username);
 
         if (request.getDisplayName() != null && !request.getDisplayName().isBlank()) {
             user.setDisplayName(request.getDisplayName());
