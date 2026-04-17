@@ -5,6 +5,7 @@ import com.example.bidmart.user.dto.UserProfileResponse;
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,16 +23,13 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserProfileResponse getCurrentUser(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
-        return mapToProfileResponse(user);
+        return mapToProfileResponse(findByUsername(username));
     }
 
     @Override
     @Transactional
     public UserProfileResponse updateProfile(String username, UpdateProfileRequest request) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        User user = findByUsername(username);
 
         if (request.getDisplayName() != null && !request.getDisplayName().isBlank()) {
             user.setDisplayName(request.getDisplayName());
@@ -42,6 +40,17 @@ public class UserServiceImpl implements UserService {
 
         User savedUser = userRepository.save(user);
         return mapToProfileResponse(savedUser);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID getUserIdByUsername(String username) {
+        return findByUsername(username).getId();
+    }
+
+    private User findByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
     }
 
     private UserProfileResponse mapToProfileResponse(User user) {
