@@ -83,18 +83,32 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse verifyMfaLogin(MfaVerificationRequest request){
         String username = jwtService.extractUsername(request.getTempToken());
-        User user = userRepository.findByUsername(username).orElseThrow(() -> IllegalArgumentException("User not found."));
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found."));
         if (!mfaService.verifyCode(user.getMfaSecret(), request.getCode())){
             throw new IllegalArgumentException("Invalid 2FA Code.");
         }
 
-        return 
+        return finalizeLogin(user, "Default Device");
     }
 
     @Override
     @Transactional
     public AuthResponse finalizeLogin(User user, String deviceInfo){
+        sessionService.enforceSessionLimit(user, 3);
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
 
+        sessionService.createSession(user, refreshToken, deviceInfo);
+
+        return AuthResponse.builder()
+            .accessToken(accessToken)
+            .refreshToken(refreshToken)
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .displayName(user.getDisplayName())
+            .role(user.getRole().name())
+            .mfaRequired(false)
+            .build();
     }
 
     @Override
