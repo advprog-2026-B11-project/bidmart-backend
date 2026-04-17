@@ -1,7 +1,7 @@
 package com.example.bidmart.wallet.controller;
 
-import com.example.bidmart.wallet.dto.CreateWalletRequest;
-import com.example.bidmart.wallet.dto.TopUpRequest;
+import com.example.bidmart.wallet.dto.*;
+import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.service.WalletService;
 import org.springframework.http.HttpStatus;
@@ -45,8 +45,7 @@ public class WalletController {
     }
 
     @PostMapping("/{userId}/top-up")
-    public ResponseEntity<Wallet> topUp(@PathVariable UUID userId,
-                                        @RequestBody TopUpRequest request) {
+    public ResponseEntity<Wallet> topUp(@PathVariable UUID userId, @RequestBody TopUpRequest request) {
         Wallet wallet = walletService.topUp(userId, request.getAmount());
 
         if (wallet == null) {
@@ -59,5 +58,54 @@ public class WalletController {
     @GetMapping("/list")
     public List<Wallet> getAllWallets() {
         return walletService.findAll();
+    }
+
+    @PostMapping("/{userId}/hold")
+    public ResponseEntity<Wallet> holdBalance(@PathVariable UUID userId, @RequestBody HoldBalanceRequest request) {
+        Wallet wallet = walletService.reserveBidFunds(userId, request.getListingId(), request.getAmount());
+        if (wallet == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(wallet);
+    }
+
+    @PostMapping("/{userId}/release")
+    public ResponseEntity<Wallet> releaseHold(@PathVariable UUID userId, @RequestBody HoldBalanceRequest request) {
+        Wallet wallet = walletService.releaseBidFunds(userId, request.getListingId(), request.getAmount());
+
+        if (wallet == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(wallet);
+    }
+
+    @PostMapping("/{userId}/settle")
+    public ResponseEntity<Wallet> settlePayment(@PathVariable UUID userId, @RequestBody HoldBalanceRequest request) {
+        Wallet wallet = walletService.settlePayment(userId, request.getAmount(), request.getListingId().toString());
+        
+        if (wallet == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(wallet);
+    }
+
+    @PostMapping("/{userId}/withdraw")
+    public ResponseEntity<Wallet> withdraw(@PathVariable UUID userId, @RequestBody WithdrawRequest request) {
+        Wallet wallet = walletService.withdraw(userId, request.getAmount());
+        
+        if (wallet == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(wallet);
+    }
+
+    @GetMapping("/{userId}/transactions")
+    public ResponseEntity<List<Transaction>> getTransactionHistory(@PathVariable UUID userId) {
+        List<Transaction> transactions = walletService.getTransactionHistory(userId);
+        
+        if (transactions == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(transactions);
     }
 }
