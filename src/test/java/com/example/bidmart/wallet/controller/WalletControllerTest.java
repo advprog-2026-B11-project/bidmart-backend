@@ -1,19 +1,22 @@
 package com.example.bidmart.wallet.controller;
 
+import com.example.bidmart.user.service.UserService;
 import com.example.bidmart.wallet.dto.*;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.service.WalletService;
-import java.math.BigDecimal;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class WalletControllerTest {
 
     @Mock
@@ -33,12 +37,16 @@ class WalletControllerTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private Authentication authentication;
+
     @InjectMocks
     private WalletController walletController;
 
     private UUID userId;
     private UUID listingId;
     private Wallet wallet;
+    private static final String USERNAME = "testuser";
 
     @BeforeEach
     void setUp() {
@@ -46,13 +54,16 @@ class WalletControllerTest {
         listingId = UUID.randomUUID();
         wallet = new Wallet(userId);
         wallet.setBalanceAvailable(new BigDecimal("100000"));
+
+        when(authentication.getName()).thenReturn(USERNAME);
+        when(userService.getUserIdByUsername(USERNAME)).thenReturn(userId);
     }
 
     @Test
     void createWallet_success() {
         when(walletService.createWallet(userId)).thenReturn(wallet);
 
-        ResponseEntity<Wallet> response = walletController.createWallet(new CreateWalletRequest(userId));
+        ResponseEntity<Wallet> response = walletController.createWallet(authentication);
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -62,13 +73,13 @@ class WalletControllerTest {
     void createWallet_conflict() {
         when(walletService.createWallet(userId)).thenReturn(null);
 
-        ResponseEntity<Wallet> response = walletController.createWallet(new CreateWalletRequest(userId));
+        ResponseEntity<Wallet> response = walletController.createWallet(authentication);
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
     }
 
     @Test
-    void getBalance_success() {
+    void getMyBalance_success() {
         when(walletService.getWalletByUserId(userId)).thenReturn(wallet);
 
         ResponseEntity<Wallet> response = walletController.getMyBalance(authentication);
@@ -81,7 +92,26 @@ class WalletControllerTest {
     void getMyBalance_notFound() {
         when(walletService.getWalletByUserId(userId)).thenReturn(null);
 
-        assertEquals(HttpStatus.NOT_FOUND, walletController.getBalance(userId).getStatusCode());
+        ResponseEntity<Wallet> response = walletController.getMyBalance(authentication);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void getBalance_success() {
+        when(walletService.getWalletByUserId(userId)).thenReturn(wallet);
+
+        ResponseEntity<Wallet> response = walletController.getBalance(userId, authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void getBalance_forbidden_whenDifferentUser() {
+        UUID otherUserId = UUID.randomUUID();
+
+        assertThrows(ResponseStatusException.class,
+                () -> walletController.getBalance(otherUserId, authentication));
     }
 
     @Test
@@ -89,7 +119,8 @@ class WalletControllerTest {
         wallet.setBalanceAvailable(new BigDecimal("150000"));
         when(walletService.topUp(eq(userId), any())).thenReturn(wallet);
 
-        ResponseEntity<Wallet> response = walletController.topUp(userId, new TopUpRequest(new BigDecimal("50000")));
+        ResponseEntity<Wallet> response = walletController.topUp(
+                userId, new TopUpRequest(new BigDecimal("50000")), authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(new BigDecimal("150000"), response.getBody().getBalanceAvailable());
@@ -99,8 +130,18 @@ class WalletControllerTest {
     void topUp_badRequest() {
         when(walletService.topUp(eq(userId), any())).thenReturn(null);
 
-        assertEquals(HttpStatus.BAD_REQUEST,
-                walletController.topUp(userId, new TopUpRequest(new BigDecimal("-1"))).getStatusCode());
+        ResponseEntity<Wallet> response = walletController.topUp(
+                userId, new TopUpRequest(new BigDecimal("-1")), authentication);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void topUp_forbidden_whenDifferentUser() {
+        UUID otherUserId = UUID.randomUUID();
+
+        assertThrows(ResponseStatusException.class,
+                () -> walletController.topUp(otherUserId, new TopUpRequest(new BigDecimal("50000")), authentication));
     }
 
     @Test
@@ -186,7 +227,7 @@ class WalletControllerTest {
 
     @Test
     void getTransactionHistory_success() {
-        Transaction tx = new Transaction(UUID.randomUUID(), "TOPUP", new BigDecimal("50000"), null);
+        Transaction tx = new Transaction();
         when(walletService.getTransactionHistory(userId)).thenReturn(List.of(tx));
 
         ResponseEntity<List<Transaction>> response = walletController.getTransactionHistory(userId);

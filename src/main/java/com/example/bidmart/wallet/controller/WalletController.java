@@ -1,5 +1,6 @@
 package com.example.bidmart.wallet.controller;
 
+import com.example.bidmart.user.service.UserService;
 import com.example.bidmart.wallet.dto.*;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
@@ -56,17 +57,6 @@ public class WalletController {
         return ResponseEntity.ok(wallet);
     }
 
-    @PostMapping("/{userId}/top-up")
-    public ResponseEntity<Wallet> topUp(@PathVariable UUID userId, @RequestBody TopUpRequest request) {
-        Wallet wallet = walletService.topUp(userId, request.getAmount());
-
-        if (wallet == null) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        return ResponseEntity.ok(wallet);
-    }
-
     @GetMapping("/{userId}/balance")
     public ResponseEntity<Wallet> getBalance(
             @PathVariable UUID userId,
@@ -83,7 +73,14 @@ public class WalletController {
             Authentication authentication
     ) {
         ensureCurrentUser(userId, authentication);
-        return topUpMyWallet(authentication, request);
+        UUID authenticatedUserId = resolveCurrentUserId(authentication);
+        Wallet wallet = walletService.topUp(authenticatedUserId, request.getAmount());
+
+        if (wallet == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        return ResponseEntity.ok(wallet);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -150,5 +147,19 @@ public class WalletController {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(wallet);
+    }
+
+    private UUID resolveCurrentUserId(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User belum terautentikasi.");
+        }
+        return userService.getUserIdByUsername(authentication.getName());
+    }
+
+    private void ensureCurrentUser(UUID userId, Authentication authentication) {
+        UUID authenticatedUserId = resolveCurrentUserId(authentication);
+        if (!authenticatedUserId.equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Akses ditolak.");
+        }
     }
 }
