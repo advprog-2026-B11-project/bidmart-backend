@@ -48,8 +48,12 @@ public class ListingController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteListing(@PathVariable UUID id) {
-        listingService.deleteListing(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteListing(@PathVariable UUID id) {
+        try {
+            listingService.deleteListing(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
