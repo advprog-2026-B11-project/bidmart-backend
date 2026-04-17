@@ -5,6 +5,7 @@ import com.example.bidmart.listing.service.ListingService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import java.util.List;
 import java.util.UUID;
@@ -40,5 +41,11 @@ public class ListingController {
     public ResponseEntity<Listing> updateListing(@PathVariable UUID id, @RequestBody Listing listing) {
         Listing updated = listingService.updateListing(id, listing);
         return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteListing(@PathVariable UUID id) {
+        listingService.deleteListing(id);
+        return ResponseEntity.noContent().build();
     }
 }

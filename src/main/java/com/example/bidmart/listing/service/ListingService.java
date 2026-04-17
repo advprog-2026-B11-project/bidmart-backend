@@ -60,4 +60,13 @@ public class ListingService {
             throw new RuntimeException("Listing tidak bisa diupdate saat auction masih aktif.");
         }
     }
+
+    public void deleteListing(UUID id) {
+        Listing existing = listingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
+
+        validateListingForUpdate(existing);
+
+        listingRepository.delete(existing);
+    }
 }
