@@ -4,6 +4,8 @@ import com.example.bidmart.wallet.dto.*;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.service.WalletService;
+import java.math.BigDecimal;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +29,9 @@ class WalletControllerTest {
 
     @Mock
     private WalletService walletService;
+
+    @Mock
+    private UserService userService;
 
     @InjectMocks
     private WalletController walletController;
@@ -66,14 +71,14 @@ class WalletControllerTest {
     void getBalance_success() {
         when(walletService.getWalletByUserId(userId)).thenReturn(wallet);
 
-        ResponseEntity<Wallet> response = walletController.getBalance(userId);
+        ResponseEntity<Wallet> response = walletController.getMyBalance(authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(new BigDecimal("100000"), response.getBody().getBalanceAvailable());
     }
 
     @Test
-    void getBalance_notFound() {
+    void getMyBalance_notFound() {
         when(walletService.getWalletByUserId(userId)).thenReturn(null);
 
         assertEquals(HttpStatus.NOT_FOUND, walletController.getBalance(userId).getStatusCode());
