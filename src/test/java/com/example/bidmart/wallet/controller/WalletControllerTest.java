@@ -5,13 +5,8 @@ import com.example.bidmart.wallet.exception.*;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.service.WalletService;
-<<<<<<< HEAD
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.UserRepository;
-=======
-import java.math.BigDecimal;
-import java.util.UUID;
->>>>>>> 7a023b5d5c01d299bc10fd1fd01aecfcaea582aa
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
