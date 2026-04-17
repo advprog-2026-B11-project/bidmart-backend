@@ -17,6 +17,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,10 +39,11 @@ import static org.mockito.Mockito.when;
 class BidServiceTest {
 
     // Mockito will use the single all-args constructor of BidService for injection.
-    @Mock private BidRepository  bidRepository;
-    @Mock private ListingService listingService;
-    @Mock private WalletService  walletService;
-    @Mock private BidRuleValidator bidRuleValidator;
+    @Mock private BidRepository            bidRepository;
+    @Mock private ListingService           listingService;
+    @Mock private WalletService            walletService;
+    @Mock private BidRuleValidator         bidRuleValidator;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private BidService bidService;

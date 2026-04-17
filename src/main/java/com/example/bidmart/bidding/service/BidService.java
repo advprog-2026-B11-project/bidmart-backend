@@ -2,6 +2,8 @@ package com.example.bidmart.bidding.service;
 
 import com.example.bidmart.bidding.dto.BidResponse;
 import com.example.bidmart.bidding.dto.CreateBidRequest;
+import com.example.bidmart.bidding.event.BidPlacedEvent;
+import com.example.bidmart.bidding.event.OutbidEvent;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.bidding.model.Bid;
@@ -10,6 +12,7 @@ import com.example.bidmart.bidding.validator.BidRuleValidator;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.wallet.service.WalletService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,17 +28,20 @@ public class BidService {
     private final ListingService listingService;
     private final WalletService walletService;
     private final BidRuleValidator bidRuleValidator;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BidService(
             BidRepository bidRepository,
             ListingService listingService,
             WalletService walletService,
-            BidRuleValidator bidRuleValidator
+            BidRuleValidator bidRuleValidator,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.bidRepository = bidRepository;
         this.listingService = listingService;
         this.walletService = walletService;
         this.bidRuleValidator = bidRuleValidator;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -80,7 +86,14 @@ public class BidService {
         bid.setProxyMaxLimit(proxyBid ? request.proxyMaxLimit() : null);
 
         Bid savedBid = bidRepository.save(bid);
-        releasePreviousHighestBidIfOutbid(currentHighestBid, savedBid);
+
+        // Release outbid user's reserved funds and capture who was outbid.
+        releaseOutbidFunds(currentHighestBid, savedBid)
+                .ifPresent(outbid -> eventPublisher.publishEvent(
+                        new OutbidEvent(savedBid.getListingId(), outbid.getBuyerId(), savedBid.getAmount())));
+
+        eventPublisher.publishEvent(
+                new BidPlacedEvent(savedBid.getListingId(), savedBid.getBuyerId(), savedBid.getAmount()));
 
         return BidResponse.from(savedBid);
     }
@@ -133,15 +146,20 @@ public class BidService {
         );
     }
 
-    private void releasePreviousHighestBidIfOutbid(Optional<Bid> previousHighestBid, Bid latestSavedBid) {
+    /**
+     * Releases reserved funds for the previous highest bidder when they are outbid.
+     * Returns the outbid bid so the caller can publish an OutbidEvent, or empty if
+     * no outbid occurred (first bid, or same buyer raising their own bid).
+     */
+    private Optional<Bid> releaseOutbidFunds(Optional<Bid> previousHighestBid, Bid newBid) {
         if (previousHighestBid.isEmpty()) {
-            return;
+            return Optional.empty();
         }
 
         Bid previous = previousHighestBid.get();
 
-        if (previous.getBuyerId().equals(latestSavedBid.getBuyerId())) {
-            return;
+        if (previous.getBuyerId().equals(newBid.getBuyerId())) {
+            return Optional.empty();
         }
 
         walletService.releaseBidFunds(
@@ -149,5 +167,7 @@ public class BidService {
                 previous.getListingId(),
                 previous.getReservedAmount()
         );
+
+        return Optional.of(previous);
     }
 }
