@@ -2,9 +2,12 @@ package com.example.bidmart.user.controller;
 
 import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
+import com.example.bidmart.user.dto.MfaVerificationRequest;
 import com.example.bidmart.user.dto.RefreshTokenRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
 import com.example.bidmart.user.service.AuthService;
+import com.example.bidmart.user.service.MfaService;
+
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,6 +52,12 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         AuthResponse response = authService.refreshToken(request.getRefreshToken());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/verify-mfa")
+    public ResponseEntity<AuthResponse> verifyMfa(@Valid @RequestBody MfaVerificationRequest request){
+        AuthResponse response = authService.verifyMfaLogin(request);
         return ResponseEntity.ok(response);
     }
 }
