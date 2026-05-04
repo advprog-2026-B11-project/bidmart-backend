@@ -28,6 +28,7 @@ public class Session {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Builder.Default
     @Column(name = "is_revoked", nullable = false)
     private boolean isRevoked = false;
 

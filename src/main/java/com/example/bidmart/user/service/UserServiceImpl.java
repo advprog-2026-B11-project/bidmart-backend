@@ -5,7 +5,9 @@ import com.example.bidmart.user.dto.UserProfileResponse;
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+
 import java.util.UUID;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,17 +44,6 @@ public class UserServiceImpl implements UserService {
         return mapToProfileResponse(savedUser);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public UUID getUserIdByUsername(String username) {
-        return findByUsername(username).getId();
-    }
-
-    private User findByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
-    }
-
     private UserProfileResponse mapToProfileResponse(User user) {
         return UserProfileResponse.builder()
                 .id(user.getId())
@@ -63,6 +54,17 @@ public class UserServiceImpl implements UserService {
                 .role(user.getRole().name())
                 .isEmailVerified(user.isEmailVerified())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID getUserIdByUsername(String username) {
+        return findByUsername(username).getId();
+    }
+
+    private User findByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
     }
 
     @Override
