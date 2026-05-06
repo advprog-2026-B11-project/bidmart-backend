@@ -6,14 +6,19 @@ import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.bidding.model.Bid;
 import com.example.bidmart.bidding.repository.BidRepository;
+import com.example.bidmart.bidding.strategy.AuctionStrategy;
+import com.example.bidmart.bidding.strategy.AuctionStrategyRegistry;
+import com.example.bidmart.bidding.strategy.ValidationResult;
 import com.example.bidmart.bidding.validator.BidRuleValidator;
 import com.example.bidmart.common.event.AuctionExtendedEvent;
 import com.example.bidmart.common.event.BidPlacedEvent;
 import com.example.bidmart.common.event.OutbidEvent;
 import com.example.bidmart.listing.model.AuctionStatus;
+import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.wallet.service.WalletService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,14 +48,23 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class BidServiceTest {
 
-    @Mock private BidRepository            bidRepository;
-    @Mock private ListingService           listingService;
-    @Mock private WalletService            walletService;
-    @Mock private BidRuleValidator         bidRuleValidator;
+    @Mock private BidRepository             bidRepository;
+    @Mock private ListingService            listingService;
+    @Mock private WalletService             walletService;
+    @Mock private BidRuleValidator          bidRuleValidator;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private AuctionStrategyRegistry   strategyRegistry;
+    @Mock private AuctionStrategy           auctionStrategy;
 
     @InjectMocks
     private BidService bidService;
+
+    @BeforeEach
+    void setUpDefaultStrategy() {
+        lenient().when(strategyRegistry.getStrategy(any(AuctionType.class))).thenReturn(auctionStrategy);
+        lenient().when(auctionStrategy.validateBid(any(), any())).thenReturn(ValidationResult.ok());
+        lenient().when(auctionStrategy.requiresFundHolding()).thenReturn(true);
+    }
 
     private Listing activeListing(UUID id, UUID sellerId, BigDecimal startingPrice) {
         Listing listing = new Listing();
