@@ -59,6 +59,10 @@ public class Listing {
     @Column(nullable = false)
     private AuctionStatus status = AuctionStatus.ACTIVE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auction_type", nullable = false)
+    private AuctionType auctionType = AuctionType.ENGLISH;
+
     @Column(name = "current_highest_bid")
     private BigDecimal currentHighestBid;
 
