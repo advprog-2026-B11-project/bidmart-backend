@@ -1,6 +1,5 @@
 package com.example.bidmart.listing.service;
 
-import com.example.bidmart.bidding.service.ListingSnapshot;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
@@ -62,26 +61,13 @@ public class ListingService {
         existing.setStartingPrice(updatedListing.getStartingPrice());
         existing.setReservePrice(updatedListing.getReservePrice());
         existing.setEndTime(updatedListing.getEndTime());
-        if (updatedListing.getStatus() != null) {
-            existing.setStatus(updatedListing.getStatus());
-        }
-
         return listingRepository.save(existing);
     }
 
     private void validateListingForUpdate(Listing listing) {
-        ListingSnapshot snapshot = new ListingSnapshot(
-                listing.getId(),
-                listing.getSellerId(),
-                listing.getStartingPrice(),
-                listing.getEndTime(),
-                listing.getStatus(),
-                listing.getCurrentHighestBid(),
-                listing.getCurrentHighestBidderId()
-        );
-
-        if (snapshot.isOpenAt(LocalDateTime.now())) {
-            throw new RuntimeException("Listing tidak bisa diupdate saat auction masih aktif.");
+        if (listing.getStatus() != null && listing.getStatus().isActive()) {
+            throw new RuntimeException(
+                    "Listing tidak bisa diupdate saat auction masih aktif.");
         }
     }
 
