@@ -10,10 +10,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,21 +34,28 @@ class UserServiceImplTest {
     @Mock
     private SessionRepository sessionRepository;
 
-    @InjectMocks
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private UserServiceImpl userService;
 
     private User user;
+    private Role mockRole;
 
     @BeforeEach
     void setUp() {
+        mockRole = new Role(UUID.randomUUID(), "USER", new HashSet<>());
+
         user = new User();
         user.setId(UUID.randomUUID());
         user.setUsername("alice");
         user.setEmail("alice@mail.com");
         user.setDisplayName("Alice");
         user.setPhoneNumber("08123456789");
-        user.setRole(Role.USER);
+        user.setRole(mockRole);
         user.setEmailVerified(false);
+
+        userService = new UserServiceImpl(userRepository, sessionRepository, eventPublisher);
     }
 
     @Test
