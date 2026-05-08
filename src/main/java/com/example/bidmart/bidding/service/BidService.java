@@ -2,17 +2,26 @@ package com.example.bidmart.bidding.service;
 
 import com.example.bidmart.bidding.dto.BidResponse;
 import com.example.bidmart.bidding.dto.CreateBidRequest;
-import com.example.bidmart.bidding.event.BidPlacedEvent;
-import com.example.bidmart.bidding.event.OutbidEvent;
+import com.example.bidmart.bidding.exception.BidConflictException;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.bidding.model.Bid;
 import com.example.bidmart.bidding.repository.BidRepository;
+import com.example.bidmart.bidding.strategy.AuctionStrategy;
+import com.example.bidmart.bidding.strategy.AuctionStrategyRegistry;
+import com.example.bidmart.bidding.strategy.ValidationResult;
 import com.example.bidmart.bidding.validator.BidRuleValidator;
+import com.example.bidmart.common.event.AuctionExtendedEvent;
+import com.example.bidmart.common.event.BidPlacedEvent;
+import com.example.bidmart.common.event.OutbidEvent;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.wallet.service.WalletService;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,36 +38,49 @@ public class BidService {
     private final WalletService walletService;
     private final BidRuleValidator bidRuleValidator;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuctionStrategyRegistry strategyRegistry;
 
     public BidService(
             BidRepository bidRepository,
             ListingService listingService,
             WalletService walletService,
             BidRuleValidator bidRuleValidator,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            AuctionStrategyRegistry strategyRegistry
     ) {
         this.bidRepository = bidRepository;
         this.listingService = listingService;
         this.walletService = walletService;
         this.bidRuleValidator = bidRuleValidator;
         this.eventPublisher = eventPublisher;
+        this.strategyRegistry = strategyRegistry;
     }
 
+    @Retryable(
+            retryFor = {ObjectOptimisticLockingFailureException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 50, multiplier = 2)
+    )
     @Transactional
     public BidResponse placeBid(UUID buyerId, CreateBidRequest request) {
-        // Phase 1: validate raw input before any I/O
         bidRuleValidator.validateRequest(request, buyerId);
 
-        ListingSnapshot listing = listingService.getListingById(request.listingId())
-                .map(this::toSnapshot)
+        Listing listingEntity = listingService.getListingByIdWithLock(request.listingId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Listing tidak ditemukan: " + request.listingId()));
+
+        ListingSnapshot listing = toSnapshot(listingEntity);
+        AuctionStrategy strategy = strategyRegistry.getStrategy(listingEntity.getAuctionType());
 
         Optional<Bid> currentHighestBid = bidRepository
                 .findTopByListingIdOrderByAmountDescCreatedAtAsc(request.listingId());
 
-        // Phase 2: validate business context (seller check, auction window, bid amount)
         bidRuleValidator.validateBidContext(buyerId, listing, request.amount(), currentHighestBid);
+
+        ValidationResult strategyResult = strategy.validateBid(request.amount(), listing);
+        if (!strategyResult.valid()) {
+            throw new BidValidationException(strategyResult.errorMessage());
+        }
 
         boolean proxyBid = Boolean.TRUE.equals(request.proxyBid());
         BigDecimal reserveTarget = proxyBid ? request.proxyMaxLimit() : request.amount();
@@ -70,11 +92,10 @@ public class BidService {
                 .map(Bid::getReservedAmount)
                 .orElse(BigDecimal.ZERO);
 
-        // Only lock the incremental amount not yet reserved for this listing.
         BigDecimal additionalReserve = reserveTarget.max(previousReservedAmount)
                 .subtract(previousReservedAmount);
 
-        if (additionalReserve.compareTo(BigDecimal.ZERO) > 0) {
+        if (strategy.requiresFundHolding() && additionalReserve.compareTo(BigDecimal.ZERO) > 0) {
             walletService.reserveBidFunds(buyerId, request.listingId(), additionalReserve);
         }
 
@@ -87,15 +108,51 @@ public class BidService {
 
         Bid savedBid = bidRepository.save(bid);
 
-        // Release outbid user's reserved funds and capture who was outbid.
+        listingEntity.updateHighestBid(savedBid.getBuyerId(), savedBid.getAmount());
+
+        boolean extended = false;
+        if (listingEntity.isWithinAntiSnipingWindow()) {
+            listingEntity.extendAuction();
+            extended = true;
+        }
+
+        listingService.save(listingEntity);
+
         releaseOutbidFunds(currentHighestBid, savedBid)
                 .ifPresent(outbid -> eventPublisher.publishEvent(
                         new OutbidEvent(savedBid.getListingId(), outbid.getBuyerId(), savedBid.getAmount())));
 
-        eventPublisher.publishEvent(
-                new BidPlacedEvent(savedBid.getListingId(), savedBid.getBuyerId(), savedBid.getAmount()));
+        eventPublisher.publishEvent(new BidPlacedEvent(
+                savedBid.getListingId(),
+                savedBid.getBuyerId(),
+                savedBid.getAmount()
+        ));
+
+        if (extended) {
+            eventPublisher.publishEvent(new AuctionExtendedEvent(
+                    listingEntity.getId(), listingEntity.getEndTime()));
+        }
 
         return BidResponse.from(savedBid);
+    }
+
+    @Recover
+    public BidResponse recoverFromConflict(ObjectOptimisticLockingFailureException ex,
+                                           UUID buyerId, CreateBidRequest request) {
+        throw new BidConflictException("Terjadi konflik penawaran, silakan coba lagi dalam beberapa saat.");
+    }
+
+    public BigDecimal getMinimumNextBid(UUID listingId) {
+        if (listingId == null) {
+            throw new BidValidationException("listingId wajib diisi.");
+        }
+
+        Listing listingEntity = listingService.getListingById(listingId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Listing tidak ditemukan: " + listingId));
+
+        AuctionStrategy strategy = strategyRegistry.getStrategy(listingEntity.getAuctionType());
+        return strategy.computeMinimumNextBid(toSnapshot(listingEntity));
     }
 
     public List<BidResponse> getBidsByListing(UUID listingId) {
@@ -130,8 +187,6 @@ public class BidService {
                 .toList();
     }
 
-    // --- private helpers ---------------------------------------------------
-
     private ListingSnapshot toSnapshot(Listing listing) {
         BigDecimal startingPrice = listing.getStartingPrice() == null
                 ? BigDecimal.ZERO
@@ -142,15 +197,12 @@ public class BidService {
                 listing.getSellerId(),
                 startingPrice,
                 listing.getEndTime(),
-                listing.getStatus()
+                listing.getStatus(),
+                listing.getCurrentHighestBid(),
+                listing.getCurrentHighestBidderId()
         );
     }
 
-    /**
-     * Releases reserved funds for the previous highest bidder when they are outbid.
-     * Returns the outbid bid so the caller can publish an OutbidEvent, or empty if
-     * no outbid occurred (first bid, or same buyer raising their own bid).
-     */
     private Optional<Bid> releaseOutbidFunds(Optional<Bid> previousHighestBid, Bid newBid) {
         if (previousHighestBid.isEmpty()) {
             return Optional.empty();
