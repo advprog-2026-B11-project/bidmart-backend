@@ -29,14 +29,14 @@ public class RoleController {
             @PathVariable String permissionName) {
         
         Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() -> new IllegalArgumentException("Role tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException("The role was not found"));
         Permission permission = permissionRepository.findByName(permissionName)
-                .orElseThrow(() -> new IllegalArgumentException("Permission tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException("The Permission was not found"));
 
         role.getPermissions().add(permission);
         roleRepository.save(role);
 
-        return ResponseEntity.ok("Permission '" + permissionName + "' berhasil ditambahkan ke role '" + roleName + "'");
+        return ResponseEntity.ok("Permission '" + permissionName + "' has been successfully added to role '" + roleName + "'");
     }
 
     @PostMapping
@@ -56,15 +56,15 @@ public class RoleController {
             @PathVariable String permissionName) {
         
         Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() -> new IllegalArgumentException("Role tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException("The role was not found"));
         Permission permission = permissionRepository.findByName(permissionName)
-                .orElseThrow(() -> new IllegalArgumentException("Permission tidak ditemukan"));
+                .orElseThrow(() -> new IllegalArgumentException("The Permission was not found"));
 
         if (role.getPermissions().contains(permission)) {
             role.getPermissions().remove(permission);
             roleRepository.save(role);
-            return ResponseEntity.ok("Permission '" + permissionName + "' berhasil dicabut dari role '" + roleName + "'");
+            return ResponseEntity.ok("Permission '" + permissionName + "' has been successfully revoked from role '" + roleName + "'");
         }
-        return ResponseEntity.badRequest().body("Role tidak memiliki permission tersebut");
+        return ResponseEntity.badRequest().body("The role does not have that permission");
     }
 }
