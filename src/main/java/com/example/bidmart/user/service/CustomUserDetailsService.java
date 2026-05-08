@@ -29,14 +29,17 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("User is deactivated: " + username);
         }
 
+        List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
+
+        user.getRole().getPermissions().forEach(permission -> 
+            authorities.add(new SimpleGrantedAuthority(permission.getName()))
+        );
+
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
-                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+                authorities
         );
-    }
-    //method for basic adding a+b
-    void adding (int a , int b){
-        
     }
 }
