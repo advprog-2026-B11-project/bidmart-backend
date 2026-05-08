@@ -23,8 +23,9 @@ public class Transaction {
     @Column(name = "wallet_id", nullable = false)
     private UUID walletId;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String type;
+    private TransactionType type;
 
     @Column(nullable = false)
     private BigDecimal amount;
@@ -35,12 +36,15 @@ public class Transaction {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(unique = true)
+    private String idempotencyKey;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
 
-    public Transaction(UUID walletId, String type, BigDecimal amount, String referenceId) {
+    public Transaction(UUID walletId, TransactionType type, BigDecimal amount, String referenceId) {
         this.walletId = walletId;
         this.type = type;
         this.amount = amount;
