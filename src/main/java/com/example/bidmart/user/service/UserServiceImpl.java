@@ -94,8 +94,8 @@ public class UserServiceImpl implements UserService {
 
         eventPublisher.publishEvent(new UserRoleChangedEvent(
                 user.getId(),
-                oldRole.name(),
-                newRole.name()
+                oldRole.getName(),
+                newRole.getName()
         ));
     }
 
@@ -106,7 +106,7 @@ public class UserServiceImpl implements UserService {
                 .email(user.getEmail())
                 .displayName(user.getDisplayName())
                 .phoneNumber(user.getPhoneNumber())
-                .role(user.getRole().name())
+                .role(user.getRole().getName())
                 .isEmailVerified(user.isEmailVerified())
                 .build();
     }

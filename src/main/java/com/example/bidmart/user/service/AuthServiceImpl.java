@@ -123,7 +123,7 @@ public class AuthServiceImpl implements AuthService {
             .username(user.getUsername())
             .email(user.getEmail())
             .displayName(user.getDisplayName())
-            .role(user.getRole().name())
+            .role(user.getRole().getName())
             .mfaRequired(false)
             .build();
     }
@@ -170,7 +170,7 @@ public class AuthServiceImpl implements AuthService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .displayName(user.getDisplayName())
-                .role(user.getRole().name())
+                .role(user.getRole().getName())
                 .build();
     }
 
