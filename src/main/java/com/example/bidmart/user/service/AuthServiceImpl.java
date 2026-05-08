@@ -7,6 +7,7 @@ import com.example.bidmart.user.dto.RegisterRequest;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.Session;
 import com.example.bidmart.user.model.User;
+import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,19 +27,22 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final SessionService sessionService;
     private final MfaService mfaService;
+    private final RoleRepository roleRepository;
 
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
                             PasswordEncoder passwordEncoder,
                             JwtService jwtService,
                             SessionService sessionService,
-                            MfaService mfaService) {
+                            MfaService mfaService,
+                            RoleRepository roleRepository) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.sessionService = sessionService;
         this.mfaService = mfaService;
+        this.roleRepository = roleRepository;
     }
 
     @Override
@@ -51,7 +55,9 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.getEmail());
         user.setDisplayName(request.getDisplayName());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(Role.USER);
+        Role defaultRole = roleRepository.findByName("USER")
+            .orElseThrow(() -> new IllegalStateException("Default role 'USER' tidak ditemukan di database."));
+        user.setRole(defaultRole);
         user.setEmailVerified(false);
 
         String verificationToken = UUID.randomUUID().toString();
