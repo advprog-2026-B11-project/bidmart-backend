@@ -125,4 +125,35 @@ class ListingModelTest {
 
         assertEquals(existing, listing.getCreatedAt());
     }
+
+    @Test
+    void allArgsConstructor_shouldSetFields() {
+        UUID id = UUID.randomUUID(), sellerId = UUID.randomUUID(),
+                categoryId = UUID.randomUUID(), bidderId = UUID.randomUUID();
+
+        LocalDateTime endTime = LocalDateTime.now(), createdAt = LocalDateTime.now();
+
+        Listing listing = new Listing(
+                id, sellerId, categoryId, "Laptop", "Gaming", "img.jpg",
+                new BigDecimal("100"), new BigDecimal("200"), endTime,
+                AuctionStatus.ACTIVE, AuctionType.ENGLISH,
+                new BigDecimal("150"), bidderId, 1L, createdAt
+        );
+
+        assertEquals(id, listing.getId());
+        assertEquals(sellerId, listing.getSellerId());
+        assertEquals(categoryId, listing.getCategoryId());
+        assertEquals("Laptop", listing.getTitle());
+        assertEquals("Gaming", listing.getDescription());
+        assertEquals("img.jpg", listing.getImageUrl());
+        assertEquals(new BigDecimal("100"), listing.getStartingPrice());
+        assertEquals(new BigDecimal("200"), listing.getReservePrice());
+        assertEquals(endTime, listing.getEndTime());
+        assertEquals(AuctionStatus.ACTIVE, listing.getStatus());
+        assertEquals(AuctionType.ENGLISH, listing.getAuctionType());
+        assertEquals(new BigDecimal("150"), listing.getCurrentHighestBid());
+        assertEquals(bidderId, listing.getCurrentHighestBidderId());
+        assertEquals(1L, listing.getVersion());
+        assertEquals(createdAt, listing.getCreatedAt());
+    }
 }
