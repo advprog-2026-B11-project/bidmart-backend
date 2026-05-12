@@ -5,7 +5,9 @@ import com.example.bidmart.notification.model.Notification;
 import com.example.bidmart.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,11 +17,17 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
 
+    @Transactional
     public Notification createNotification(UUID userId, String type, String message) {
-        Notification notification = new Notification(userId, type, message);
+        Notification notification = Notification.builder()
+                .userId(userId)
+                .type(type)
+                .message(message)
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .build();
         return notificationRepository.save(notification);
     }
-
     public List<Notification> getUserNotifications(UUID userId) {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
@@ -28,18 +36,21 @@ public class NotificationService {
         return notificationRepository.findByUserIdAndIsReadFalse(userId);
     }
 
+    @Transactional
     public Notification markAsRead(UUID notificationId) {
         Notification notification = getNotificationOrThrow(notificationId);
         notification.setRead(true);
         return notificationRepository.save(notification);
     }
 
+    @Transactional
     public void markAllAsRead(UUID userId) {
         List<Notification> unreadNotifications = notificationRepository.findByUserIdAndIsReadFalse(userId);
         unreadNotifications.forEach(notif -> notif.setRead(true));
         notificationRepository.saveAll(unreadNotifications);
     }
 
+    @Transactional
     public void deleteNotification(UUID notificationId) {
         Notification notification = getNotificationOrThrow(notificationId);
         notificationRepository.delete(notification);
