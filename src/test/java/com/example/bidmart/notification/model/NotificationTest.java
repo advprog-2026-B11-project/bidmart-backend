@@ -42,6 +42,45 @@ class NotificationTest {
     }
 
     @Test
+    void testNotificationBuilder() {
+        UUID id = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        LocalDateTime time = LocalDateTime.now();
+
+        Notification notif = Notification.builder()
+                .id(id)
+                .userId(userId)
+                .type("ALERT")
+                .message("Builder Message")
+                .isRead(true)
+                .createdAt(time)
+                .build();
+
+        assertEquals(id, notif.getId());
+        assertEquals(userId, notif.getUserId());
+        assertEquals("ALERT", notif.getType());
+        assertEquals("Builder Message", notif.getMessage());
+        assertTrue(notif.isRead());
+        assertEquals(time, notif.getCreatedAt());
+    }
+
+    @Test
+    void testAllArgsConstructor() {
+        UUID id = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        LocalDateTime time = LocalDateTime.now();
+
+        Notification notif = new Notification(id, userId, "SYSTEM", "All Args", false, time);
+
+        assertEquals(id, notif.getId());
+        assertEquals(userId, notif.getUserId());
+        assertEquals("SYSTEM", notif.getType());
+        assertEquals("All Args", notif.getMessage());
+        assertFalse(notif.isRead());
+        assertEquals(time, notif.getCreatedAt());
+    }
+
+    @Test
     void testPrePersistOnCreate() {
         Notification notif = new Notification();
 

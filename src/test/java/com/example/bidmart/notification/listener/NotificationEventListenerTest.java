@@ -2,6 +2,7 @@ package com.example.bidmart.notification.listener;
 
 import com.example.bidmart.common.event.AuctionWonEvent;
 import com.example.bidmart.common.event.BidPlacedEvent;
+import com.example.bidmart.common.event.OrderDeliveredEvent;
 import com.example.bidmart.common.event.OutbidEvent;
 import com.example.bidmart.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,12 @@ class NotificationEventListenerTest {
                 eq("AUCTION_WON"),
                 anyString()
         );
+
+        verify(notificationService, times(1)).createNotification(
+                eq(sellerId),
+                eq("AUCTION_SOLD"),
+                anyString()
+        );
     }
 
     @Test
@@ -72,6 +79,23 @@ class NotificationEventListenerTest {
         verify(notificationService, times(1)).createNotification(
                 eq(outbidUserId),
                 eq("OUTBID"),
+                anyString()
+        );
+    }
+
+    @Test
+    void handleOrderDelivered_success() {
+        UUID orderId = UUID.randomUUID();
+        UUID buyerId = UUID.randomUUID();
+        UUID sellerId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("150000.00");
+        OrderDeliveredEvent event = new OrderDeliveredEvent(orderId, buyerId, sellerId, amount);
+
+        notificationEventListener.handleOrderDelivered(event);
+
+        verify(notificationService, times(1)).createNotification(
+                eq(sellerId),
+                eq("ORDER_DELIVERED"),
                 anyString()
         );
     }
