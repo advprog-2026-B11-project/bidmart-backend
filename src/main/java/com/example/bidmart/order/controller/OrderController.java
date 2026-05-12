@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +25,40 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
+    @PatchMapping("/{orderId}/tracking")
+    public ResponseEntity<Order> updateTrackingNumber(
+            @PathVariable UUID orderId,
+            @RequestBody Map<String, String> requestBody) {
+
+        UUID requesterId = UUID.fromString(requestBody.get("requesterId"));
+        String trackingNumber = requestBody.get("trackingNumber");
+
+        Order updatedOrder = orderService.updateTrackingNumber(orderId, requesterId, trackingNumber);
+        return ResponseEntity.ok(updatedOrder);
+    }
+
+    @PatchMapping("/{orderId}/confirm")
+    public ResponseEntity<Order> confirmDelivery(
+            @PathVariable UUID orderId,
+            @RequestBody Map<String, String> requestBody) {
+
+        UUID requesterId = UUID.fromString(requestBody.get("requesterId"));
+        Order updatedOrder = orderService.confirmDelivery(orderId, requesterId);
+        return ResponseEntity.ok(updatedOrder);
+    }
+
+    @PatchMapping("/{orderId}/dispute")
+    public ResponseEntity<Order> disputeOrder(
+            @PathVariable UUID orderId,
+            @RequestBody Map<String, String> requestBody) {
+
+        UUID requesterId = UUID.fromString(requestBody.get("requesterId"));
+        String reason = requestBody.get("reason");
+
+        Order updatedOrder = orderService.disputeOrder(orderId, requesterId, reason);
+        return ResponseEntity.ok(updatedOrder);
+    }
+
     @PatchMapping("/{orderId}/status")
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable UUID orderId,
@@ -34,22 +69,14 @@ public class OrderController {
         return ResponseEntity.ok(updatedOrder);
     }
 
-    @PatchMapping("/{orderId}/tracking")
-    public ResponseEntity<Order> updateTrackingNumber(
-            @PathVariable UUID orderId,
-            @RequestBody Map<String, String> requestBody) {
-
-        String trackingNumber = requestBody.get("trackingNumber");
-        Order updatedOrder = orderService.updateTrackingNumber(orderId, trackingNumber);
-        return ResponseEntity.ok(updatedOrder);
-    }
-
     @PostMapping("/test-create")
     public ResponseEntity<Order> createOrderTest(@RequestBody Map<String, String> requestBody) {
         UUID listingId = UUID.fromString(requestBody.get("listingId"));
         UUID buyerId = UUID.fromString(requestBody.get("buyerId"));
+        UUID sellerId = UUID.fromString(requestBody.get("sellerId"));
+        BigDecimal amount = new BigDecimal(requestBody.get("amount"));
 
-        Order newOrder = orderService.createOrderAutomatically(listingId, buyerId);
+        Order newOrder = orderService.createOrderAutomatically(listingId, buyerId, sellerId, amount);
         return ResponseEntity.ok(newOrder);
     }
 

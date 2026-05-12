@@ -31,8 +31,9 @@ class NotificationEventListenerTest {
     void handleAuctionWon_success() {
         UUID listingId = UUID.randomUUID();
         UUID winnerId = UUID.randomUUID();
+        UUID sellerId = UUID.randomUUID();
         BigDecimal winningPrice = new BigDecimal("150000.00");
-        AuctionWonEvent event = new AuctionWonEvent(listingId, winnerId, winningPrice);
+        AuctionWonEvent event = new AuctionWonEvent(listingId, winnerId, sellerId, winningPrice);
 
         notificationEventListener.handleAuctionWon(event);
 

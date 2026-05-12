@@ -47,6 +47,7 @@ public class AuctionClosingService {
             eventPublisher.publishEvent(new AuctionWonEvent(
                     listing.getId(),
                     listing.getCurrentHighestBidderId(),
+                    listing.getSellerId(),
                     listing.getCurrentHighestBid()
             ));
 

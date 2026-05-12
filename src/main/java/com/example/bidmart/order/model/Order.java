@@ -3,6 +3,7 @@ package com.example.bidmart.order.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -25,6 +26,15 @@ public class Order {
     @Column(name = "buyer_id", nullable = false)
     private UUID buyerId;
 
+    @Column(name = "seller_id", nullable = false)
+    private UUID sellerId;
+
+    @Column(nullable = false)
+    private BigDecimal amount;
+
+    @Column(name = "dispute_reason")
+    private String disputeReason;
+
     @Column(nullable = false)
     private String status;
 
@@ -34,9 +44,11 @@ public class Order {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public Order(UUID listingId, UUID buyerId, String status) {
+    public Order(UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount, String status) {
         this.listingId = listingId;
         this.buyerId = buyerId;
+        this.sellerId = sellerId;
+        this.amount = amount;
         this.status = status;
     }
 
