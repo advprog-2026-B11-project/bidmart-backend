@@ -2,8 +2,11 @@ package com.example.bidmart.notification.service;
 
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.notification.model.Notification;
+import com.example.bidmart.notification.model.NotificationPreference;
+import com.example.bidmart.notification.repository.NotificationPreferenceRepository;
 import com.example.bidmart.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,18 +19,38 @@ import java.util.UUID;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationPreferenceRepository preferenceRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public Notification createNotification(UUID userId, String type, String message) {
-        Notification notification = Notification.builder()
-                .userId(userId)
-                .type(type)
-                .message(message)
-                .isRead(false)
-                .createdAt(LocalDateTime.now())
-                .build();
-        return notificationRepository.save(notification);
+        NotificationPreference preference = preferenceRepository.findByUserId(userId)
+                .orElseGet(() -> createDefaultPreference(userId));
+
+        Notification notification = null;
+
+        if (preference.isInAppEnabled()) {
+            notification = Notification.builder()
+                    .userId(userId)
+                    .type(type)
+                    .message(message)
+                    .isRead(false)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            notification = notificationRepository.save(notification);
+        }
+
+        if (preference.isPushEnabled()) {
+            messagingTemplate.convertAndSendToUser(
+                    userId.toString(),
+                    "/queue/notifications",
+                    notification != null ? notification : message
+            );
+        }
+
+        return notification;
     }
+
     public List<Notification> getUserNotifications(UUID userId) {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
