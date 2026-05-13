@@ -119,4 +119,18 @@ class AuthControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("testuser", response.getBody().getUsername());
     }
+
+    @Test
+    void resendVerification_shouldReturnOk() {
+        ResendVerificationRequest request = new ResendVerificationRequest();
+        request.setIdentifier("test@mail.com");
+
+        doNothing().when(authService).resendVerification("test@mail.com");
+
+        ResponseEntity<String> response = authController.resendVerification(request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Verification email sent.", response.getBody());
+        verify(authService, times(1)).resendVerification("test@mail.com");
+    }
 }

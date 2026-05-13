@@ -2,6 +2,8 @@ package com.example.bidmart.user.service;
 
 import com.example.bidmart.common.event.UserDeactivatedEvent;
 import com.example.bidmart.common.event.UserRoleChangedEvent;
+import com.example.bidmart.user.dto.MfaSetupResponse;
+import com.example.bidmart.user.dto.MfaStatusResponse;
 import com.example.bidmart.user.dto.UpdateProfileRequest;
 import com.example.bidmart.user.dto.UserProfileResponse;
 import com.example.bidmart.user.model.Role;
@@ -19,16 +21,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserServiceImpl implements UserService {
 
+    private static final String MFA_METHOD_TOTP = "TOTP";
+    private static final String MFA_METHOD_NONE = "NONE";
+
     private final UserRepository userRepository;
     private final SessionRepository sessionRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final MfaService mfaService;
 
     public UserServiceImpl(UserRepository userRepository,
                            SessionRepository sessionRepository,
-                           ApplicationEventPublisher eventPublisher) {
+                           ApplicationEventPublisher eventPublisher,
+                           MfaService mfaService) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.eventPublisher = eventPublisher;
+        this.mfaService = mfaService;
     }
 
     @Override
@@ -51,6 +59,60 @@ public class UserServiceImpl implements UserService {
 
         User savedUser = userRepository.save(user);
         return mapToProfileResponse(savedUser);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MfaStatusResponse getMfaStatus(String username) {
+        User user = findByUsername(username);
+        return mapToMfaStatus(user);
+    }
+
+    @Override
+    @Transactional
+    public MfaSetupResponse setupMfa(String username) {
+        User user = findByUsername(username);
+
+        String secret = mfaService.generateMfaSecret();
+        user.setMfaSecret(secret);
+        user.setMfaEnabled(false);
+        userRepository.save(user);
+
+        String qrCodeImageUri = mfaService.getQrCodeImageUri(secret, user.getEmail());
+        return MfaSetupResponse.builder()
+                .secret(secret)
+                .qrCodeImageUri(qrCodeImageUri)
+                .method(MFA_METHOD_TOTP)
+                .enabled(false)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public MfaStatusResponse enableMfa(String username, String code) {
+        User user = findByUsername(username);
+        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new IllegalArgumentException("MFA is not configured. Please run setup first.");
+        }
+        if (!mfaService.verifyCode(user.getMfaSecret(), code)) {
+            throw new IllegalArgumentException("Invalid 2FA Code.");
+        }
+        if (!user.isMfaEnabled()) {
+            user.setMfaEnabled(true);
+            userRepository.save(user);
+        }
+        return mapToMfaStatus(user);
+    }
+
+    @Override
+    @Transactional
+    public MfaStatusResponse disableMfa(String username) {
+        User user = findByUsername(username);
+        if (user.isMfaEnabled()) {
+            user.setMfaEnabled(false);
+            userRepository.save(user);
+        }
+        return mapToMfaStatus(user);
     }
 
     @Override
@@ -110,6 +172,17 @@ public class UserServiceImpl implements UserService {
                 .isEmailVerified(user.isEmailVerified())
                 .build();
     }
+
+        private MfaStatusResponse mapToMfaStatus(User user) {
+        String method = user.getMfaSecret() == null || user.getMfaSecret().isBlank()
+            ? MFA_METHOD_NONE
+            : MFA_METHOD_TOTP;
+
+        return MfaStatusResponse.builder()
+            .enabled(user.isMfaEnabled())
+            .method(method)
+            .build();
+        }
 
     @Override
     @Transactional(readOnly = true)

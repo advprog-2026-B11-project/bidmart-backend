@@ -37,6 +37,9 @@ class UserServiceImplTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private MfaService mfaService;
+
     private UserServiceImpl userService;
 
     private User user;
@@ -55,7 +58,7 @@ class UserServiceImplTest {
         user.setRole(mockRole);
         user.setEmailVerified(false);
 
-        userService = new UserServiceImpl(userRepository, sessionRepository, eventPublisher);
+        userService = new UserServiceImpl(userRepository, sessionRepository, eventPublisher, mfaService);
     }
 
     @Test

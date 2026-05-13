@@ -10,6 +10,7 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,8 @@ public class AuthServiceImpl implements AuthService {
     private final SessionService sessionService;
     private final MfaService mfaService;
     private final RoleRepository roleRepository;
+    private final EmailService emailService;
+    private final String verificationUrlTemplate;
 
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
@@ -35,7 +38,9 @@ public class AuthServiceImpl implements AuthService {
                             JwtService jwtService,
                             SessionService sessionService,
                             MfaService mfaService,
-                            RoleRepository roleRepository) {
+                            RoleRepository roleRepository,
+                            EmailService emailService,
+                            @Value("${app.email.verification-url-template}") String verificationUrlTemplate) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
@@ -43,6 +48,8 @@ public class AuthServiceImpl implements AuthService {
         this.sessionService = sessionService;
         this.mfaService = mfaService;
         this.roleRepository = roleRepository;
+        this.emailService = emailService;
+        this.verificationUrlTemplate = verificationUrlTemplate;
     }
 
     @Override
@@ -64,6 +71,8 @@ public class AuthServiceImpl implements AuthService {
         user.setVerificationToken(verificationToken);
 
         User savedUser = userRepository.save(user);
+
+        sendVerificationEmail(savedUser, verificationToken);
 
         return mapToAuthResponse(savedUser, null, null);
     }
@@ -142,6 +151,22 @@ public class AuthServiceImpl implements AuthService {
         return true;
     }
 
+    @Override
+    @Transactional
+    public void resendVerification(String identifier) {
+        User user = findUserByIdentifier(identifier);
+
+        if (user.isEmailVerified()) {
+            throw new IllegalArgumentException("Email already verified.");
+        }
+
+        String verificationToken = UUID.randomUUID().toString();
+        user.setVerificationToken(verificationToken);
+        userRepository.save(user);
+
+        sendVerificationEmail(user, verificationToken);
+    }
+
     private void validateNewUser(String username, String email) {
         if (userRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("Username is already taken.");
@@ -172,6 +197,18 @@ public class AuthServiceImpl implements AuthService {
                 .displayName(user.getDisplayName())
                 .role(user.getRole().getName())
                 .build();
+    }
+
+    private void sendVerificationEmail(User user, String verificationToken) {
+        String verificationUrl = buildVerificationUrl(verificationToken);
+        emailService.sendVerificationEmail(user.getEmail(), verificationUrl);
+    }
+
+    private String buildVerificationUrl(String token) {
+        if (verificationUrlTemplate.contains("{token}")) {
+            return verificationUrlTemplate.replace("{token}", token);
+        }
+        return verificationUrlTemplate + token;
     }
 
     @Override

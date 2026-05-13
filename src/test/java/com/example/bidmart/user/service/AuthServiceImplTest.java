@@ -43,6 +43,8 @@ class AuthServiceImplTest {
     private MfaService mfaService;
     @Mock
     private RoleRepository roleRepository;
+    @Mock
+    private EmailService emailService;
 
     private AuthServiceImpl authService;
 
@@ -68,7 +70,9 @@ class AuthServiceImplTest {
                 jwtService,
                 sessionService,
                 mfaService,
-                roleRepository 
+            roleRepository,
+            emailService,
+            "http://localhost:8080/api/auth/verify?token={token}"
         );
     }
 
@@ -97,6 +101,31 @@ class AuthServiceImplTest {
         assertNotNull(response);
         assertEquals("newuser", response.getUsername());
         verify(userRepository, times(1)).save(any(User.class));
+        verify(emailService, times(1)).sendVerificationEmail(eq("new@mail.com"), anyString());
+    }
+
+    @Test
+    void resendVerification_shouldRotateTokenAndSendEmail() {
+        mockUser.setEmailVerified(false);
+        mockUser.setVerificationToken("old-token");
+
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(mockUser));
+
+        authService.resendVerification("test@mail.com");
+
+        assertNotNull(mockUser.getVerificationToken());
+        verify(userRepository, times(1)).save(mockUser);
+        verify(emailService, times(1)).sendVerificationEmail(eq("test@mail.com"), anyString());
+    }
+
+    @Test
+    void resendVerification_shouldThrowWhenAlreadyVerified() {
+        mockUser.setEmailVerified(true);
+
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(mockUser));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.resendVerification("test@mail.com"));
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
     }
 
     @Test
