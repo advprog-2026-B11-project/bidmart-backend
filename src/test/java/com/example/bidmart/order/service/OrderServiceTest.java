@@ -2,6 +2,7 @@ package com.example.bidmart.order.service;
 
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
+import com.example.bidmart.common.event.OrderRefundedEvent;
 import com.example.bidmart.order.exception.InvalidOrderStatusTransitionException;
 import com.example.bidmart.order.model.Order;
 import com.example.bidmart.order.model.OrderStatus;
@@ -51,11 +52,20 @@ class OrderServiceTest {
 
     @Test
     void createOrderAutomatically_success() {
+        when(orderRepository.findByListingId(listingId)).thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenReturn(order);
         Order result = orderService.createOrderAutomatically(listingId, buyerId, sellerId, BigDecimal.valueOf(100));
         assertNotNull(result);
         assertEquals(OrderStatus.CREATED, result.getStatus());
         verify(orderRepository, times(1)).save(any(Order.class));
+    }
+
+    @Test
+    void createOrderAutomatically_existingOrder_returnsExisting() {
+        when(orderRepository.findByListingId(listingId)).thenReturn(Optional.of(order));
+        Order result = orderService.createOrderAutomatically(listingId, buyerId, sellerId, BigDecimal.valueOf(100));
+        assertEquals(order, result);
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     @Test
@@ -130,6 +140,40 @@ class OrderServiceTest {
         Order result = orderService.disputeOrder(orderId, buyerId, "Barang rusak");
         assertEquals(OrderStatus.DISPUTED, result.getStatus());
         assertEquals("Barang rusak", result.getDisputeReason());
+    }
+
+    @Test
+    void resolveDispute_refundBuyer_success() {
+        order.setStatus(OrderStatus.DISPUTED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        Order result = orderService.resolveDispute(orderId, true);
+
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        verify(eventPublisher, times(1)).publishEvent(any(OrderRefundedEvent.class));
+    }
+
+    @Test
+    void resolveDispute_paySeller_success() {
+        order.setStatus(OrderStatus.DISPUTED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        Order result = orderService.resolveDispute(orderId, false);
+
+        assertEquals(OrderStatus.DELIVERED, result.getStatus());
+        verify(eventPublisher, times(1)).publishEvent(any(OrderDeliveredEvent.class));
+    }
+
+    @Test
+    void resolveDispute_invalidTransition_throwsException() {
+        order.setStatus(OrderStatus.CREATED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThrows(InvalidOrderStatusTransitionException.class, () -> {
+            orderService.resolveDispute(orderId, true);
+        });
     }
 
     @Test

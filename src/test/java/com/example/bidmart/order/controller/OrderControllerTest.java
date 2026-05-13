@@ -88,6 +88,17 @@ class OrderControllerTest {
     }
 
     @Test
+    void resolveDispute_returnsOk() {
+        when(orderService.resolveDispute(orderId, true)).thenReturn(order);
+
+        Map<String, Boolean> request = new HashMap<>();
+        request.put("refundBuyer", true);
+
+        ResponseEntity<Order> response = orderController.resolveDispute(orderId, request);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
     void updateOrderStatus_returnsOk() {
         when(orderService.updateOrderStatus(orderId, "SHIPPED")).thenReturn(order);
         Map<String, String> request = new HashMap<>();

@@ -2,6 +2,7 @@ package com.example.bidmart.order.service;
 
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
+import com.example.bidmart.common.event.OrderRefundedEvent;
 import com.example.bidmart.order.exception.InvalidOrderStatusTransitionException;
 import com.example.bidmart.order.model.Order;
 import com.example.bidmart.order.model.OrderStatus;
@@ -25,6 +26,11 @@ public class OrderService {
 
     @Transactional
     public Order createOrderAutomatically(UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount) {
+        Optional<Order> existingOrder = orderRepository.findByListingId(listingId);
+        if (existingOrder.isPresent()) {
+            return existingOrder.get();
+        }
+
         Order newOrder = Order.builder()
                 .listingId(listingId)
                 .buyerId(buyerId)
@@ -109,6 +115,29 @@ public class OrderService {
 
         order.setStatus(OrderStatus.DISPUTED);
         order.setDisputeReason(reason);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order resolveDispute(UUID orderId, boolean refundBuyer) {
+        Order order = getOrderOrThrow(orderId);
+        
+        if (!order.getStatus().canTransitionTo(OrderStatus.CANCELLED) && refundBuyer) {
+             throw new InvalidOrderStatusTransitionException(order.getStatus().name(), OrderStatus.CANCELLED.name());
+        }
+
+        if (refundBuyer) {
+            order.setStatus(OrderStatus.CANCELLED);
+            eventPublisher.publishEvent(new OrderRefundedEvent(
+                order.getId(), order.getBuyerId(), order.getAmount()
+            ));
+        } else {
+             order.setStatus(OrderStatus.DELIVERED);
+             eventPublisher.publishEvent(new OrderDeliveredEvent(
+                order.getId(), order.getBuyerId(), order.getSellerId(), order.getAmount()
+            ));
+        }
+        
         return orderRepository.save(order);
     }
 

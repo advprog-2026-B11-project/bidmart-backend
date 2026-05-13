@@ -96,4 +96,16 @@ public class OrderController {
         orderService.deleteOrder(orderId);
         return ResponseEntity.ok(Map.of("message", "Pesanan berhasil dihapus"));
     }
+
+    @PatchMapping("/{orderId}/resolve-dispute")
+    @PreAuthorize("hasAuthority('SCOPE_ADMIN') or hasAuthority('order:resolve')")
+    public ResponseEntity<Order> resolveDispute(
+            @PathVariable UUID orderId,
+            @RequestBody Map<String, Boolean> requestBody) {
+
+        boolean refundBuyer = requestBody.getOrDefault("refundBuyer", false);
+        
+        Order updatedOrder = orderService.resolveDispute(orderId, refundBuyer);
+        return ResponseEntity.ok(updatedOrder);
+    }
 }
