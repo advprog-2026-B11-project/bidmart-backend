@@ -37,11 +37,23 @@ public class Notification {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "delivery_status")
+    private String deliveryStatus = "PENDING";
+
     public Notification(UUID userId, String type, String message) {
         this.userId = userId;
         this.type = type;
         this.message = message;
         this.isRead = false;
+    }
+
+    public Notification(UUID id, UUID userId, String type, String message, boolean isRead, LocalDateTime createdAt) {
+        this.id = id;
+        this.userId = userId;
+        this.type = type;
+        this.message = message;
+        this.isRead = isRead;
+        this.createdAt = createdAt;
     }
 
     @PrePersist

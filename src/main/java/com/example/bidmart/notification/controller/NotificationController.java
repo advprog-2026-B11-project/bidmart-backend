@@ -36,18 +36,8 @@ public class NotificationController {
 
     @PatchMapping("/{notificationId}/read")
     @PreAuthorize("hasAuthority('notification:update')")
-    public ResponseEntity<Notification> markAsRead(@PathVariable UUID notificationId) {
+    public ResponseEntity<Notification> markAsRead(@PathVariable UUID notificationId, org.springframework.security.core.Authentication authentication) {
         return ResponseEntity.ok(notificationService.markAsRead(notificationId));
-    }
-
-    @PostMapping("/test-create")
-    @PreAuthorize("hasAuthority('SCOPE_ADMIN')")    
-    public ResponseEntity<Notification> createTestNotification(@RequestBody Map<String, String> requestBody) {
-        UUID userId = UUID.fromString(requestBody.get("userId"));
-        String type = requestBody.get("type");
-        String message = requestBody.get("message");
-
-        return ResponseEntity.ok(notificationService.createNotification(userId, type, message));
     }
 
     @PatchMapping("/user/{userId}/read-all")
@@ -75,11 +65,24 @@ public class NotificationController {
     public ResponseEntity<NotificationPreference> updatePreferences(
             @PathVariable UUID userId,
             @RequestBody NotificationPreferenceRequest request) {
-        return ResponseEntity.ok(notificationService.updatePreference(
+        
+        NotificationPreference updatedPref = notificationService.updatePreference(
                 userId,
                 request.isEmailEnabled(),
                 request.isPushEnabled(),
-                request.isInAppEnabled()
-        ));
+                request.isInAppEnabled(),
+                request.getMutedTypes()
+        );
+        return ResponseEntity.ok(updatedPref);
+    }
+
+    @PostMapping("/test-create")
+    @PreAuthorize("hasAuthority('SCOPE_ADMIN')")
+    public ResponseEntity<Notification> createTestNotification(@RequestBody Map<String, String> requestBody) {
+        UUID userId = UUID.fromString(requestBody.get("userId"));
+        String type = requestBody.get("type");
+        String message = requestBody.get("message");
+
+        return ResponseEntity.ok(notificationService.createNotification(userId, type, message));
     }
 }

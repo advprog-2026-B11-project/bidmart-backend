@@ -135,11 +135,11 @@ class NotificationControllerTest {
         request.setPushEnabled(true);
         request.setInAppEnabled(true);
 
-        when(notificationService.updatePreference(userId, false, true, true)).thenReturn(preference);
+        when(notificationService.updatePreference(eq(userId), eq(false), eq(true), eq(true), any())).thenReturn(preference);
 
         ResponseEntity<NotificationPreference> response = notificationController.updatePreferences(userId, request);
         
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(notificationService, times(1)).updatePreference(userId, false, true, true);
+        verify(notificationService, times(1)).updatePreference(eq(userId), eq(false), eq(true), eq(true), any());
     }
 }
