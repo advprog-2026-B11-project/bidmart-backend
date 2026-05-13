@@ -39,6 +39,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final String verificationUrlTemplate;
     private final long emailMfaCodeTtlSeconds;
+    private final int maxConcurrentSessions;
 
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
@@ -49,7 +50,8 @@ public class AuthServiceImpl implements AuthService {
                             RoleRepository roleRepository,
                             EmailService emailService,
                             @Value("${app.email.verification-url-template}") String verificationUrlTemplate,
-                            @Value("${app.mfa.email-code-ttl-seconds:300}") long emailMfaCodeTtlSeconds) {
+                            @Value("${app.mfa.email-code-ttl-seconds:300}") long emailMfaCodeTtlSeconds,
+                            @Value("${app.session.max-concurrent:3}") int maxConcurrentSessions) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
@@ -60,6 +62,7 @@ public class AuthServiceImpl implements AuthService {
         this.emailService = emailService;
         this.verificationUrlTemplate = verificationUrlTemplate;
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
+        this.maxConcurrentSessions = maxConcurrentSessions;
     }
 
     @Override
@@ -137,7 +140,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse finalizeLogin(User user, String deviceInfo){
-        sessionService.enforceSessionLimit(user, 3);
+        sessionService.enforceSessionLimit(user, maxConcurrentSessions);
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 

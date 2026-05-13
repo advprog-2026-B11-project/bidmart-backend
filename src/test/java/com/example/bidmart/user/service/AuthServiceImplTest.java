@@ -75,7 +75,8 @@ class AuthServiceImplTest {
             roleRepository,
             emailService,
             "http://localhost:8080/api/auth/verify?token={token}",
-            300L
+            300L,
+            3
         );
     }
 
