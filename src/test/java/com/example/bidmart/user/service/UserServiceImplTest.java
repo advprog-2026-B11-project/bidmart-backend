@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.HashSet;
 import java.util.Optional;
@@ -40,6 +41,9 @@ class UserServiceImplTest {
     @Mock
     private MfaService mfaService;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     private UserServiceImpl userService;
 
     private User user;
@@ -60,7 +64,7 @@ class UserServiceImplTest {
         user.setRole(mockRole);
         user.setEmailVerified(false);
 
-        userService = new UserServiceImpl(userRepository, sessionRepository, eventPublisher, mfaService);
+        userService = new UserServiceImpl(userRepository, sessionRepository, eventPublisher, mfaService, passwordEncoder);
     }
 
     @Test

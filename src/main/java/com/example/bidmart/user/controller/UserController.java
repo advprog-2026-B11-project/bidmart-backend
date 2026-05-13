@@ -1,5 +1,6 @@
 package com.example.bidmart.user.controller;
 
+import com.example.bidmart.user.dto.MfaDisableRequest;
 import com.example.bidmart.user.dto.MfaEnableRequest;
 import com.example.bidmart.user.dto.MfaSetupResponse;
 import com.example.bidmart.user.dto.MfaStatusResponse;
@@ -71,8 +72,13 @@ public class UserController {
     }
 
     @PostMapping("/me/mfa/disable")
-    public ResponseEntity<MfaStatusResponse> disableMfa(Authentication authentication) {
-        MfaStatusResponse status = userService.disableMfa(authentication.getName());
+    public ResponseEntity<MfaStatusResponse> disableMfa(
+            Authentication authentication,
+            @Valid @RequestBody MfaDisableRequest request) {
+        MfaStatusResponse status = userService.disableMfa(
+                authentication.getName(),
+                request.getPassword(),
+                request.getTotpCode());
         return ResponseEntity.ok(status);
     }
 

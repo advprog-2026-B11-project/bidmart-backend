@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.time.Instant;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +29,18 @@ public class UserServiceImpl implements UserService {
     private final SessionRepository sessionRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final MfaService mfaService;
+    private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(UserRepository userRepository,
                            SessionRepository sessionRepository,
                            ApplicationEventPublisher eventPublisher,
-                           MfaService mfaService) {
+                           MfaService mfaService,
+                           PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.eventPublisher = eventPublisher;
         this.mfaService = mfaService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -124,8 +128,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public MfaStatusResponse disableMfa(String username) {
+    public MfaStatusResponse disableMfa(String username, String password, String totpCode) {
         User user = findByUsername(username);
+        ensureReauthentication(user, password, totpCode);
         if (user.isMfaEnabled()) {
             user.setMfaEnabled(false);
             user.setMfaEmailCode(null);
@@ -204,6 +209,30 @@ public class UserServiceImpl implements UserService {
                 .enabled(user.isMfaEnabled())
                 .method(method)
                 .build();
+    }
+
+    private void ensureReauthentication(User user, String password, String totpCode) {
+        boolean hasPassword = password != null && !password.isBlank();
+        boolean hasTotpCode = totpCode != null && !totpCode.isBlank();
+
+        if (!hasPassword && !hasTotpCode) {
+            throw new IllegalArgumentException("Password or TOTP code is required.");
+        }
+
+        if (hasPassword && passwordEncoder.matches(password, user.getPassword())) {
+            return;
+        }
+
+        if (hasTotpCode) {
+            if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+                throw new IllegalArgumentException("TOTP is not configured.");
+            }
+            if (mfaService.verifyCode(user.getMfaSecret(), totpCode)) {
+                return;
+            }
+        }
+
+        throw new IllegalArgumentException("Invalid password or 2FA Code.");
     }
 
     @Override
