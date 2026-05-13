@@ -3,6 +3,7 @@ package com.example.bidmart.user.service;
 import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
+import com.example.bidmart.user.model.MfaMethod;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.Session;
 import com.example.bidmart.user.model.User;
@@ -62,6 +63,7 @@ class AuthServiceImplTest {
         mockUser.setPassword("encoded-password");
         mockUser.setRole(mockRole);
         mockUser.setDisplayName("Test User");
+        mockUser.setEmailVerified(true);
 
         authService = new AuthServiceImpl(
                 userRepository,
@@ -72,7 +74,8 @@ class AuthServiceImplTest {
                 mfaService,
             roleRepository,
             emailService,
-            "http://localhost:8080/api/auth/verify?token={token}"
+            "http://localhost:8080/api/auth/verify?token={token}",
+            300L
         );
     }
 
@@ -178,6 +181,7 @@ class AuthServiceImplTest {
         request.setIdentifier("testuser");
         request.setPassword("password123");
         mockUser.setMfaEnabled(true);
+        mockUser.setMfaMethod(MfaMethod.TOTP);
 
         when(userRepository.findByEmail("testuser")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
@@ -189,6 +193,28 @@ class AuthServiceImplTest {
         assertTrue(response.isMfaRequired());
         assertEquals("temp-token", response.getTempToken());
         assertNull(response.getAccessToken());
+    }
+
+    @Test
+    void login_shouldSendEmailCodeWhenEmailMfaEnabled() {
+        LoginRequest request = new LoginRequest();
+        request.setIdentifier("testuser");
+        request.setPassword("password123");
+        mockUser.setMfaEnabled(true);
+        mockUser.setMfaMethod(MfaMethod.EMAIL);
+
+        when(userRepository.findByEmail("testuser")).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
+        when(passwordEncoder.matches("password123", "encoded-password")).thenReturn(true);
+        when(jwtService.generateTempToken(mockUser)).thenReturn("temp-token");
+
+        AuthResponse response = authService.login(request, "Test Device");
+
+        assertTrue(response.isMfaRequired());
+        assertEquals("temp-token", response.getTempToken());
+        assertNotNull(mockUser.getMfaEmailCode());
+        assertNotNull(mockUser.getMfaEmailCodeExpiresAt());
+        verify(emailService, times(1)).sendMfaCodeEmail(eq("test@mail.com"), anyString());
     }
 
     @Test

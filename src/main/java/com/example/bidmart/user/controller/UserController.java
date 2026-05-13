@@ -64,6 +64,12 @@ public class UserController {
         return ResponseEntity.ok(status);
     }
 
+    @PostMapping("/me/mfa/email/enable")
+    public ResponseEntity<MfaStatusResponse> enableEmailMfa(Authentication authentication) {
+        MfaStatusResponse status = userService.enableEmailMfa(authentication.getName());
+        return ResponseEntity.ok(status);
+    }
+
     @PostMapping("/me/mfa/disable")
     public ResponseEntity<MfaStatusResponse> disableMfa(Authentication authentication) {
         MfaStatusResponse status = userService.disableMfa(authentication.getName());

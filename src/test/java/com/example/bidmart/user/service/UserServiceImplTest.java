@@ -55,6 +55,8 @@ class UserServiceImplTest {
         user.setEmail("alice@mail.com");
         user.setDisplayName("Alice");
         user.setPhoneNumber("08123456789");
+        user.setImageUrl("https://img.example.com/alice.png");
+        user.setShippingAddress("Jl. Sudirman No. 1, Jakarta");
         user.setRole(mockRole);
         user.setEmailVerified(false);
 
@@ -65,6 +67,7 @@ class UserServiceImplTest {
     void updateProfile_shouldUpdateOnlyProvidedFields() {
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setDisplayName("Alice Updated");
+        request.setImageUrl("https://img.example.com/alice-new.png");
 
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(userRepository.save(user)).thenReturn(user);
@@ -73,6 +76,7 @@ class UserServiceImplTest {
 
         assertEquals("Alice Updated", response.getDisplayName());
         assertEquals("08123456789", response.getPhoneNumber());
+        assertEquals("https://img.example.com/alice-new.png", response.getImageUrl());
         verify(userRepository, times(1)).save(user);
     }
 

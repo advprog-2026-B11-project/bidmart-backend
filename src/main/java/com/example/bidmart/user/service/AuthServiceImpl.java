@@ -4,6 +4,7 @@ import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
 import com.example.bidmart.user.dto.MfaVerificationRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
+import com.example.bidmart.user.model.MfaMethod;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.Session;
 import com.example.bidmart.user.model.User;
@@ -15,12 +16,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class AuthServiceImpl implements AuthService {
+
+    private static final int EMAIL_MFA_CODE_LENGTH = 6;
+    private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     private final UserRepository userRepository;
     private final SessionRepository sessionRepository;
@@ -31,6 +38,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final EmailService emailService;
     private final String verificationUrlTemplate;
+    private final long emailMfaCodeTtlSeconds;
 
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
@@ -40,7 +48,8 @@ public class AuthServiceImpl implements AuthService {
                             MfaService mfaService,
                             RoleRepository roleRepository,
                             EmailService emailService,
-                            @Value("${app.email.verification-url-template}") String verificationUrlTemplate) {
+                            @Value("${app.email.verification-url-template}") String verificationUrlTemplate,
+                            @Value("${app.mfa.email-code-ttl-seconds:300}") long emailMfaCodeTtlSeconds) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
@@ -50,6 +59,7 @@ public class AuthServiceImpl implements AuthService {
         this.roleRepository = roleRepository;
         this.emailService = emailService;
         this.verificationUrlTemplate = verificationUrlTemplate;
+        this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
     }
 
     @Override
@@ -96,8 +106,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (user.isMfaEnabled()){
-            String tempToken = jwtService.generateTempToken(user);
-            return AuthResponse.builder().mfaRequired(true).tempToken(tempToken).build();
+            return startMfaChallenge(user);
         }
 
         String resolvedDeviceInfo = (deviceInfo == null || deviceInfo.isBlank())
@@ -115,7 +124,10 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Account is deactivated.");
         }
 
-        if (!mfaService.verifyCode(user.getMfaSecret(), request.getCode())){
+        MfaMethod method = resolveMfaMethod(user);
+        if (method == MfaMethod.EMAIL) {
+            verifyEmailMfa(user, request.getCode());
+        } else if (!mfaService.verifyCode(user.getMfaSecret(), request.getCode())){
             throw new IllegalArgumentException("Invalid 2FA Code.");
         }
 
@@ -214,6 +226,52 @@ public class AuthServiceImpl implements AuthService {
             return verificationUrlTemplate.replace("{token}", token);
         }
         return verificationUrlTemplate + token;
+    }
+
+    private AuthResponse startMfaChallenge(User user) {
+        MfaMethod method = resolveMfaMethod(user);
+        if (method == MfaMethod.EMAIL) {
+            issueEmailMfaCode(user);
+        }
+        String tempToken = jwtService.generateTempToken(user);
+        return AuthResponse.builder().mfaRequired(true).tempToken(tempToken).build();
+    }
+
+    private MfaMethod resolveMfaMethod(User user) {
+        return user.getMfaMethod() == null ? MfaMethod.TOTP : user.getMfaMethod();
+    }
+
+    private void issueEmailMfaCode(User user) {
+        String code = generateEmailMfaCode();
+        user.setMfaEmailCode(code);
+        user.setMfaEmailCodeExpiresAt(Instant.now().plusSeconds(emailMfaCodeTtlSeconds));
+        userRepository.save(user);
+        emailService.sendMfaCodeEmail(user.getEmail(), code);
+    }
+
+    private void verifyEmailMfa(User user, String code) {
+        if (user.getMfaEmailCode() == null || user.getMfaEmailCodeExpiresAt() == null) {
+            throw new IllegalArgumentException("2FA code expired or not requested.");
+        }
+        if (user.getMfaEmailCodeExpiresAt().isBefore(Instant.now())) {
+            clearEmailMfaCode(user);
+            throw new IllegalArgumentException("2FA code expired or not requested.");
+        }
+        if (!user.getMfaEmailCode().equals(code)) {
+            throw new IllegalArgumentException("Invalid 2FA Code.");
+        }
+        clearEmailMfaCode(user);
+    }
+
+    private void clearEmailMfaCode(User user) {
+        user.setMfaEmailCode(null);
+        user.setMfaEmailCodeExpiresAt(null);
+        userRepository.save(user);
+    }
+
+    private String generateEmailMfaCode() {
+        int value = secureRandom.nextInt(EMAIL_MFA_CODE_MAX);
+        return String.format("%0" + EMAIL_MFA_CODE_LENGTH + "d", value);
     }
 
     @Override

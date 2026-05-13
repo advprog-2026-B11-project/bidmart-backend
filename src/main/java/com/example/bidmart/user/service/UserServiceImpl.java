@@ -6,6 +6,7 @@ import com.example.bidmart.user.dto.MfaSetupResponse;
 import com.example.bidmart.user.dto.MfaStatusResponse;
 import com.example.bidmart.user.dto.UpdateProfileRequest;
 import com.example.bidmart.user.dto.UserProfileResponse;
+import com.example.bidmart.user.model.MfaMethod;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
@@ -21,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserServiceImpl implements UserService {
 
-    private static final String MFA_METHOD_TOTP = "TOTP";
     private static final String MFA_METHOD_NONE = "NONE";
 
     private final UserRepository userRepository;
@@ -56,6 +56,12 @@ public class UserServiceImpl implements UserService {
         if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
             user.setPhoneNumber(request.getPhoneNumber());
         }
+        if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
+            user.setImageUrl(request.getImageUrl());
+        }
+        if (request.getShippingAddress() != null && !request.getShippingAddress().isBlank()) {
+            user.setShippingAddress(request.getShippingAddress());
+        }
 
         User savedUser = userRepository.save(user);
         return mapToProfileResponse(savedUser);
@@ -76,13 +82,14 @@ public class UserServiceImpl implements UserService {
         String secret = mfaService.generateMfaSecret();
         user.setMfaSecret(secret);
         user.setMfaEnabled(false);
+        user.setMfaMethod(MfaMethod.TOTP);
         userRepository.save(user);
 
         String qrCodeImageUri = mfaService.getQrCodeImageUri(secret, user.getEmail());
         return MfaSetupResponse.builder()
                 .secret(secret)
                 .qrCodeImageUri(qrCodeImageUri)
-                .method(MFA_METHOD_TOTP)
+            .method(MfaMethod.TOTP.name())
                 .enabled(false)
                 .build();
     }
@@ -99,8 +106,19 @@ public class UserServiceImpl implements UserService {
         }
         if (!user.isMfaEnabled()) {
             user.setMfaEnabled(true);
-            userRepository.save(user);
         }
+        user.setMfaMethod(MfaMethod.TOTP);
+        userRepository.save(user);
+        return mapToMfaStatus(user);
+    }
+
+    @Override
+    @Transactional
+    public MfaStatusResponse enableEmailMfa(String username) {
+        User user = findByUsername(username);
+        user.setMfaEnabled(true);
+        user.setMfaMethod(MfaMethod.EMAIL);
+        userRepository.save(user);
         return mapToMfaStatus(user);
     }
 
@@ -110,6 +128,8 @@ public class UserServiceImpl implements UserService {
         User user = findByUsername(username);
         if (user.isMfaEnabled()) {
             user.setMfaEnabled(false);
+            user.setMfaEmailCode(null);
+            user.setMfaEmailCodeExpiresAt(null);
             userRepository.save(user);
         }
         return mapToMfaStatus(user);
@@ -168,21 +188,23 @@ public class UserServiceImpl implements UserService {
                 .email(user.getEmail())
                 .displayName(user.getDisplayName())
                 .phoneNumber(user.getPhoneNumber())
+                .imageUrl(user.getImageUrl())
+                .shippingAddress(user.getShippingAddress())
                 .role(user.getRole().getName())
                 .isEmailVerified(user.isEmailVerified())
                 .build();
     }
 
-        private MfaStatusResponse mapToMfaStatus(User user) {
-        String method = user.getMfaSecret() == null || user.getMfaSecret().isBlank()
-            ? MFA_METHOD_NONE
-            : MFA_METHOD_TOTP;
+    private MfaStatusResponse mapToMfaStatus(User user) {
+        String method = user.getMfaMethod() == null
+                ? MFA_METHOD_NONE
+                : user.getMfaMethod().name();
 
         return MfaStatusResponse.builder()
-            .enabled(user.isMfaEnabled())
-            .method(method)
-            .build();
-        }
+                .enabled(user.isMfaEnabled())
+                .method(method)
+                .build();
+    }
 
     @Override
     @Transactional(readOnly = true)
