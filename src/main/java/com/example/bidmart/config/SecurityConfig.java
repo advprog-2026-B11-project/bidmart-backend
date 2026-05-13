@@ -45,6 +45,17 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/wallet/**").permitAll()
+                
+                .requestMatchers(
+                    "/api/wallet/hold",
+                    "/api/wallet/release",
+                    "/api/wallet/settle",
+                    "/api/wallet/confirm-delivery"
+                ).hasRole("INTERNAL_SERVICE")
+
+                // User endpoints wallet
+                .requestMatchers("/api/wallet/**").authenticated()
+                
                 .requestMatchers("/listings/**").permitAll()
                 .requestMatchers("/api/bids/mocks/**").permitAll()
                 .requestMatchers("/api/bids/**").permitAll()
