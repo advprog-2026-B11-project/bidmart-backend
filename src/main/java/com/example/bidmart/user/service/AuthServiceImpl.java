@@ -90,6 +90,11 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Invalid password.");
         }
 
+        if (!user.isEmailVerified()) {
+            resendVerification(user.getEmail()); 
+            throw new IllegalArgumentException("Your email has not been verified yet. A new verification link has been sent to your email address.");
+        }
+
         if (user.isMfaEnabled()){
             String tempToken = jwtService.generateTempToken(user);
             return AuthResponse.builder().mfaRequired(true).tempToken(tempToken).build();
