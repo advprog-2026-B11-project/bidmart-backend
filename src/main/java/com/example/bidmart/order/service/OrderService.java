@@ -1,9 +1,9 @@
 package com.example.bidmart.order.service;
 
-import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
 import com.example.bidmart.common.event.OrderRefundedEvent;
 import com.example.bidmart.order.exception.InvalidOrderStatusTransitionException;
+import com.example.bidmart.order.exception.OrderNotFoundException;
 import com.example.bidmart.order.model.Order;
 import com.example.bidmart.order.model.OrderStatus;
 import com.example.bidmart.order.repository.OrderRepository;
@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -121,19 +122,21 @@ public class OrderService {
     @Transactional
     public Order resolveDispute(UUID orderId, boolean refundBuyer) {
         Order order = getOrderOrThrow(orderId);
-        
-        if (!order.getStatus().canTransitionTo(OrderStatus.CANCELLED) && refundBuyer) {
-             throw new InvalidOrderStatusTransitionException(order.getStatus().name(), OrderStatus.CANCELLED.name());
-        }
 
         if (refundBuyer) {
+            if (!order.getStatus().canTransitionTo(OrderStatus.CANCELLED)) {
+                throw new InvalidOrderStatusTransitionException(order.getStatus().name(), OrderStatus.CANCELLED.name());
+            }
             order.setStatus(OrderStatus.CANCELLED);
             eventPublisher.publishEvent(new OrderRefundedEvent(
                 order.getId(), order.getBuyerId(), order.getAmount()
             ));
         } else {
-             order.setStatus(OrderStatus.DELIVERED);
-             eventPublisher.publishEvent(new OrderDeliveredEvent(
+            if (!order.getStatus().canTransitionTo(OrderStatus.DELIVERED)) {
+                throw new InvalidOrderStatusTransitionException(order.getStatus().name(), OrderStatus.DELIVERED.name());
+            }
+            order.setStatus(OrderStatus.DELIVERED);
+            eventPublisher.publishEvent(new OrderDeliveredEvent(
                 order.getId(), order.getBuyerId(), order.getSellerId(), order.getAmount()
             ));
         }
@@ -143,12 +146,14 @@ public class OrderService {
 
     @Transactional
     public void deleteOrder(UUID orderId) {
-        Order order = getOrderOrThrow(orderId);
-        orderRepository.delete(order);
+        if (!orderRepository.existsById(orderId)) {
+            throw new OrderNotFoundException("Pesanan tidak ditemukan dengan ID: " + orderId);
+        }
+        orderRepository.deleteById(orderId);
     }
 
     private Order getOrderOrThrow(UUID orderId) {
         return orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Pesanan tidak ditemukan dengan ID: " + orderId));
+                .orElseThrow(() -> new OrderNotFoundException("Pesanan tidak ditemukan dengan ID: " + orderId));
     }
 }

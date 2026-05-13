@@ -6,10 +6,15 @@ import static org.junit.jupiter.api.Assertions.*;
 class InvalidOrderStatusTransitionExceptionTest {
 
     @Test
-    void testExceptionMessage() {
+    void testExceptionMessageFormatting() {
+        String currentStatus = "CREATED";
+        String nextStatus = "DELIVERED";
+        
         InvalidOrderStatusTransitionException exception = 
-                new InvalidOrderStatusTransitionException("CREATED", "DELIVERED");
-                
-        assertTrue(exception.getMessage().contains("dari CREATED ke DELIVERED"));
+                new InvalidOrderStatusTransitionException(currentStatus, nextStatus);
+        
+        assertTrue(exception.getMessage().contains(currentStatus));
+        assertTrue(exception.getMessage().contains(nextStatus));
+        assertEquals("Transisi status tidak valid: dari CREATED ke DELIVERED", exception.getMessage());
     }
 }

@@ -1,9 +1,9 @@
 package com.example.bidmart.order.service;
 
-import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
 import com.example.bidmart.common.event.OrderRefundedEvent;
 import com.example.bidmart.order.exception.InvalidOrderStatusTransitionException;
+import com.example.bidmart.order.exception.OrderNotFoundException;
 import com.example.bidmart.order.model.Order;
 import com.example.bidmart.order.model.OrderStatus;
 import com.example.bidmart.order.repository.OrderRepository;
@@ -168,7 +168,7 @@ class OrderServiceTest {
 
     @Test
     void resolveDispute_invalidTransition_throwsException() {
-        order.setStatus(OrderStatus.CREATED);
+        order.setStatus(OrderStatus.DELIVERED); 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
         assertThrows(InvalidOrderStatusTransitionException.class, () -> {
@@ -178,15 +178,17 @@ class OrderServiceTest {
 
     @Test
     void deleteOrder_success() {
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        doNothing().when(orderRepository).delete(order);
+        when(orderRepository.existsById(orderId)).thenReturn(true);
+        doNothing().when(orderRepository).deleteById(orderId);
+        
         orderService.deleteOrder(orderId);
-        verify(orderRepository, times(1)).delete(order);
+        
+        verify(orderRepository, times(1)).deleteById(orderId);
     }
     
     @Test
     void getOrder_notFound_throwsException() {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
-        assertThrows(ResourceNotFoundException.class, () -> orderService.deleteOrder(orderId));
+        assertThrows(OrderNotFoundException.class, () -> orderService.updateOrderStatus(orderId, "SHIPPED"));
     }
 }

@@ -1,8 +1,5 @@
 package com.example.bidmart.order.model;
 
-import java.util.Arrays;
-import java.util.List;
-
 public enum OrderStatus {
     DRAFT,
     CREATED,

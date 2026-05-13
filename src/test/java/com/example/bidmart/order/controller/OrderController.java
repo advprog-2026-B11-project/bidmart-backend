@@ -1,5 +1,6 @@
 package com.example.bidmart.order.controller;
 
+import com.example.bidmart.order.dto.*;
 import com.example.bidmart.order.model.Order;
 import com.example.bidmart.order.model.OrderStatus;
 import com.example.bidmart.order.service.OrderService;
@@ -59,8 +60,8 @@ class OrderControllerTest {
         when(authentication.getName()).thenReturn(sellerId.toString());
         when(orderService.updateTrackingNumber(eq(orderId), eq(sellerId), eq("RESI123"))).thenReturn(order);
         
-        Map<String, String> request = new HashMap<>();
-        request.put("trackingNumber", "RESI123");
+        UpdateTrackingRequest request = new UpdateTrackingRequest();
+        request.setTrackingNumber("RESI123");
 
         ResponseEntity<Order> response = orderController.updateTrackingNumber(orderId, request, authentication);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -80,8 +81,8 @@ class OrderControllerTest {
         when(authentication.getName()).thenReturn(buyerId.toString());
         when(orderService.disputeOrder(eq(orderId), eq(buyerId), eq("Rusak"))).thenReturn(order);
 
-        Map<String, String> request = new HashMap<>();
-        request.put("reason", "Rusak");
+        DisputeRequest request = new DisputeRequest();
+        request.setReason("Rusak");
 
         ResponseEntity<Order> response = orderController.disputeOrder(orderId, request, authentication);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -91,8 +92,8 @@ class OrderControllerTest {
     void resolveDispute_returnsOk() {
         when(orderService.resolveDispute(orderId, true)).thenReturn(order);
 
-        Map<String, Boolean> request = new HashMap<>();
-        request.put("refundBuyer", true);
+        ResolveDisputeRequest request = new ResolveDisputeRequest();
+        request.setRefundBuyer(true);
 
         ResponseEntity<Order> response = orderController.resolveDispute(orderId, request);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -101,8 +102,9 @@ class OrderControllerTest {
     @Test
     void updateOrderStatus_returnsOk() {
         when(orderService.updateOrderStatus(orderId, "SHIPPED")).thenReturn(order);
-        Map<String, String> request = new HashMap<>();
-        request.put("status", "SHIPPED");
+        
+        UpdateOrderStatusRequest request = new UpdateOrderStatusRequest();
+        request.setStatus("SHIPPED");
 
         ResponseEntity<Order> response = orderController.updateOrderStatus(orderId, request);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -113,11 +115,11 @@ class OrderControllerTest {
         when(orderService.createOrderAutomatically(eq(listingId), eq(buyerId), eq(sellerId), any(BigDecimal.class)))
                 .thenReturn(order);
 
-        Map<String, String> request = new HashMap<>();
-        request.put("listingId", listingId.toString());
-        request.put("buyerId", buyerId.toString());
-        request.put("sellerId", sellerId.toString());
-        request.put("amount", "100");
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setListingId(listingId);
+        request.setBuyerId(buyerId);
+        request.setSellerId(sellerId);
+        request.setAmount(BigDecimal.valueOf(100));
 
         ResponseEntity<Order> response = orderController.createOrderTest(request);
         assertEquals(HttpStatus.OK, response.getStatusCode());
