@@ -1,14 +1,18 @@
 package com.example.bidmart.order.service;
 
-import com.example.bidmart.bidding.exception.ResourceNotFoundException; // Memakai exception yang sudah ada
+import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
+import com.example.bidmart.order.exception.InvalidOrderStatusTransitionException;
 import com.example.bidmart.order.model.Order;
+import com.example.bidmart.order.model.OrderStatus;
 import com.example.bidmart.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,14 +24,14 @@ public class OrderService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public Order createOrderAutomatically(UUID listingId, UUID buyerId, UUID sellerId, java.math.BigDecimal amount) {
+    public Order createOrderAutomatically(UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount) {
         Order newOrder = Order.builder()
                 .listingId(listingId)
                 .buyerId(buyerId)
                 .sellerId(sellerId)
                 .amount(amount)
-                .status("CREATED")
-                .createdAt(java.time.LocalDateTime.now())
+                .status(OrderStatus.CREATED)
+                .createdAt(LocalDateTime.now())
                 .build();
         return orderRepository.save(newOrder);
     }
@@ -37,8 +41,14 @@ public class OrderService {
     }
 
     @Transactional
-    public Order updateOrderStatus(UUID orderId, String newStatus) {
+    public Order updateOrderStatus(UUID orderId, String newStatusStr) {
         Order order = getOrderOrThrow(orderId);
+        OrderStatus newStatus = OrderStatus.fromString(newStatusStr);
+        
+        if (!order.getStatus().canTransitionTo(newStatus)) {
+            throw new InvalidOrderStatusTransitionException(order.getStatus().name(), newStatus.name());
+        }
+        
         order.setStatus(newStatus);
         return orderRepository.save(order);
     }
@@ -50,8 +60,13 @@ public class OrderService {
         if (!order.getSellerId().equals(requesterId)) {
             throw new IllegalArgumentException("Hanya penjual yang dapat memperbarui nomor resi.");
         }
+        
+        if (!order.getStatus().canTransitionTo(OrderStatus.SHIPPED)) {
+            throw new InvalidOrderStatusTransitionException(order.getStatus().name(), OrderStatus.SHIPPED.name());
+        }
+        
         order.setTrackingNumber(trackingNumber);
-        order.setStatus("SHIPPED");
+        order.setStatus(OrderStatus.SHIPPED);
         return orderRepository.save(order);
     }
 
@@ -62,8 +77,12 @@ public class OrderService {
         if (!order.getBuyerId().equals(requesterId)) {
             throw new IllegalArgumentException("Hanya pembeli yang dapat mengonfirmasi penerimaan barang.");
         }
+        
+        if (!order.getStatus().canTransitionTo(OrderStatus.DELIVERED)) {
+            throw new InvalidOrderStatusTransitionException(order.getStatus().name(), OrderStatus.DELIVERED.name());
+        }
 
-        order.setStatus("DELIVERED");
+        order.setStatus(OrderStatus.DELIVERED);
         Order savedOrder = orderRepository.save(order);
 
         eventPublisher.publishEvent(new OrderDeliveredEvent(
@@ -84,7 +103,11 @@ public class OrderService {
             throw new IllegalArgumentException("Hanya pembeli yang dapat mengajukan sengketa.");
         }
 
-        order.setStatus("DISPUTED");
+        if (!order.getStatus().canTransitionTo(OrderStatus.DISPUTED)) {
+            throw new InvalidOrderStatusTransitionException(order.getStatus().name(), OrderStatus.DISPUTED.name());
+        }
+
+        order.setStatus(OrderStatus.DISPUTED);
         order.setDisputeReason(reason);
         return orderRepository.save(order);
     }

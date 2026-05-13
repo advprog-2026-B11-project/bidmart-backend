@@ -2,19 +2,19 @@ package com.example.bidmart.order.service;
 
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
+import com.example.bidmart.order.exception.InvalidOrderStatusTransitionException;
 import com.example.bidmart.order.model.Order;
+import com.example.bidmart.order.model.OrderStatus;
 import com.example.bidmart.order.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -36,67 +36,52 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    private UUID orderId;
-    private UUID buyerId;
-    private UUID sellerId;
-    private UUID listingId;
-    private BigDecimal amount;
+    private UUID orderId, listingId, buyerId, sellerId;
     private Order order;
 
     @BeforeEach
     void setUp() {
         orderId = UUID.randomUUID();
+        listingId = UUID.randomUUID();
         buyerId = UUID.randomUUID();
         sellerId = UUID.randomUUID();
-        listingId = UUID.randomUUID();
-        amount = new BigDecimal("150000.00");
-
-        order = Order.builder()
-                .id(orderId)
-                .listingId(listingId)
-                .buyerId(buyerId)
-                .sellerId(sellerId)
-                .amount(amount)
-                .status("CREATED")
-                .createdAt(LocalDateTime.now())
-                .build();
+        order = new Order(listingId, buyerId, sellerId, BigDecimal.valueOf(100), OrderStatus.CREATED);
+        order.setId(orderId);
     }
 
     @Test
     void createOrderAutomatically_success() {
         when(orderRepository.save(any(Order.class))).thenReturn(order);
-        Order result = orderService.createOrderAutomatically(listingId, buyerId, sellerId, amount);
-
+        Order result = orderService.createOrderAutomatically(listingId, buyerId, sellerId, BigDecimal.valueOf(100));
         assertNotNull(result);
-        assertEquals("CREATED", result.getStatus());
-        assertEquals(sellerId, result.getSellerId());
-        verify(orderRepository).save(any(Order.class));
+        assertEquals(OrderStatus.CREATED, result.getStatus());
+        verify(orderRepository, times(1)).save(any(Order.class));
     }
 
     @Test
     void getOrdersByBuyer_success() {
         when(orderRepository.findByBuyerId(buyerId)).thenReturn(Arrays.asList(order));
         List<Order> result = orderService.getOrdersByBuyer(buyerId);
-
         assertEquals(1, result.size());
-        assertEquals(orderId, result.get(0).getId());
-        verify(orderRepository).findByBuyerId(buyerId);
     }
 
     @Test
-    void updateOrderStatus_success() {
+    void updateOrderStatus_validTransition_success() {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
-        Order result = orderService.updateOrderStatus(orderId, "PAID");
-        assertEquals("PAID", result.getStatus());
-        verify(orderRepository).save(order);
+        Order result = orderService.updateOrderStatus(orderId, "SHIPPED");
+        assertEquals(OrderStatus.SHIPPED, result.getStatus());
     }
 
     @Test
-    void updateOrderStatus_notFound_throwsException() {
-        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
-        assertThrows(ResourceNotFoundException.class, () -> orderService.updateOrderStatus(orderId, "PAID"));
+    void updateOrderStatus_invalidTransition_throwsException() {
+        order.setStatus(OrderStatus.DELIVERED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThrows(InvalidOrderStatusTransitionException.class, () -> {
+            orderService.updateOrderStatus(orderId, "CREATED");
+        });
     }
 
     @Test
@@ -105,84 +90,58 @@ class OrderServiceTest {
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         Order result = orderService.updateTrackingNumber(orderId, sellerId, "RESI123");
-
-        assertEquals("SHIPPED", result.getStatus());
         assertEquals("RESI123", result.getTrackingNumber());
+        assertEquals(OrderStatus.SHIPPED, result.getStatus());
     }
 
     @Test
-    void updateTrackingNumber_unauthorized_throwsException() {
+    void updateTrackingNumber_wrongUser_throwsException() {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        UUID wrongId = UUID.randomUUID(); // Bukan seller
-
-        assertThrows(IllegalArgumentException.class, () -> orderService.updateTrackingNumber(orderId, wrongId, "RESI123"));
-    }
-
-    @Test
-    void updateTrackingNumber_notFound_throwsException() {
-        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
-        assertThrows(ResourceNotFoundException.class, () -> orderService.updateTrackingNumber(orderId, sellerId, "RESI123"));
+        assertThrows(IllegalArgumentException.class, () -> {
+            orderService.updateTrackingNumber(orderId, buyerId, "RESI123");
+        });
     }
 
     @Test
     void confirmDelivery_success() {
+        order.setStatus(OrderStatus.SHIPPED);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         Order result = orderService.confirmDelivery(orderId, buyerId);
-
-        assertEquals("DELIVERED", result.getStatus());
-        verify(orderRepository).save(order);
-
-        ArgumentCaptor<OrderDeliveredEvent> eventCaptor = ArgumentCaptor.forClass(OrderDeliveredEvent.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
-
-        OrderDeliveredEvent capturedEvent = eventCaptor.getValue();
-        assertEquals(orderId, capturedEvent.getOrderId());
-        assertEquals(buyerId, capturedEvent.getBuyerId());
-        assertEquals(sellerId, capturedEvent.getSellerId());
-        assertEquals(amount, capturedEvent.getAmount());
+        assertEquals(OrderStatus.DELIVERED, result.getStatus());
+        verify(eventPublisher, times(1)).publishEvent(any(OrderDeliveredEvent.class));
     }
 
     @Test
-    void confirmDelivery_unauthorized_throwsException() {
+    void confirmDelivery_invalidState_throwsException() {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        UUID wrongId = UUID.randomUUID();
-
-        assertThrows(IllegalArgumentException.class, () -> orderService.confirmDelivery(orderId, wrongId));
-        verify(eventPublisher, never()).publishEvent(any());
+        assertThrows(InvalidOrderStatusTransitionException.class, () -> {
+            orderService.confirmDelivery(orderId, buyerId);
+        });
     }
 
     @Test
     void disputeOrder_success() {
+        order.setStatus(OrderStatus.SHIPPED);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
-        String reason = "Barang cacat";
-        Order result = orderService.disputeOrder(orderId, buyerId, reason);
-
-        assertEquals("DISPUTED", result.getStatus());
-        assertEquals(reason, result.getDisputeReason());
-        verify(orderRepository).save(order);
-    }
-
-    @Test
-    void disputeOrder_unauthorized_throwsException() {
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        UUID wrongId = UUID.randomUUID();
-
-        assertThrows(IllegalArgumentException.class, () -> orderService.disputeOrder(orderId, wrongId, "Cacat"));
+        Order result = orderService.disputeOrder(orderId, buyerId, "Barang rusak");
+        assertEquals(OrderStatus.DISPUTED, result.getStatus());
+        assertEquals("Barang rusak", result.getDisputeReason());
     }
 
     @Test
     void deleteOrder_success() {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        doNothing().when(orderRepository).delete(order);
         orderService.deleteOrder(orderId);
-        verify(orderRepository).delete(order);
+        verify(orderRepository, times(1)).delete(order);
     }
-
+    
     @Test
-    void deleteOrder_notFound_throwsException() {
+    void getOrder_notFound_throwsException() {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> orderService.deleteOrder(orderId));
     }

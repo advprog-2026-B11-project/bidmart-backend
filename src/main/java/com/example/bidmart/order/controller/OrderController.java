@@ -4,6 +4,8 @@ import com.example.bidmart.order.model.Order;
 import com.example.bidmart.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -20,17 +22,20 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping("/buyer/{buyerId}")
+    @PreAuthorize("hasAuthority('order:read') and (#buyerId.toString() == authentication.name or hasAuthority('SCOPE_ADMIN'))")
     public ResponseEntity<List<Order>> getOrdersByBuyer(@PathVariable UUID buyerId) {
         List<Order> orders = orderService.getOrdersByBuyer(buyerId);
         return ResponseEntity.ok(orders);
     }
 
     @PatchMapping("/{orderId}/tracking")
+    @PreAuthorize("hasAuthority('order:update')")
     public ResponseEntity<Order> updateTrackingNumber(
             @PathVariable UUID orderId,
-            @RequestBody Map<String, String> requestBody) {
+            @RequestBody Map<String, String> requestBody,
+            Authentication authentication) {
 
-        UUID requesterId = UUID.fromString(requestBody.get("requesterId"));
+        UUID requesterId = UUID.fromString(authentication.getName());
         String trackingNumber = requestBody.get("trackingNumber");
 
         Order updatedOrder = orderService.updateTrackingNumber(orderId, requesterId, trackingNumber);
@@ -38,21 +43,24 @@ public class OrderController {
     }
 
     @PatchMapping("/{orderId}/confirm")
+    @PreAuthorize("hasAuthority('order:update')")
     public ResponseEntity<Order> confirmDelivery(
             @PathVariable UUID orderId,
-            @RequestBody Map<String, String> requestBody) {
+            Authentication authentication) {
 
-        UUID requesterId = UUID.fromString(requestBody.get("requesterId"));
+        UUID requesterId = UUID.fromString(authentication.getName());
         Order updatedOrder = orderService.confirmDelivery(orderId, requesterId);
         return ResponseEntity.ok(updatedOrder);
     }
 
     @PatchMapping("/{orderId}/dispute")
+    @PreAuthorize("hasAuthority('order:update')")
     public ResponseEntity<Order> disputeOrder(
             @PathVariable UUID orderId,
-            @RequestBody Map<String, String> requestBody) {
+            @RequestBody Map<String, String> requestBody,
+            Authentication authentication) {
 
-        UUID requesterId = UUID.fromString(requestBody.get("requesterId"));
+        UUID requesterId = UUID.fromString(authentication.getName());
         String reason = requestBody.get("reason");
 
         Order updatedOrder = orderService.disputeOrder(orderId, requesterId, reason);
@@ -60,6 +68,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{orderId}/status")
+    @PreAuthorize("hasAuthority('order:update-status') or hasAuthority('SCOPE_ADMIN')")
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable UUID orderId,
             @RequestBody Map<String, String> requestBody) {
@@ -70,6 +79,7 @@ public class OrderController {
     }
 
     @PostMapping("/test-create")
+    @PreAuthorize("hasAuthority('SCOPE_ADMIN')")
     public ResponseEntity<Order> createOrderTest(@RequestBody Map<String, String> requestBody) {
         UUID listingId = UUID.fromString(requestBody.get("listingId"));
         UUID buyerId = UUID.fromString(requestBody.get("buyerId"));
@@ -81,6 +91,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{orderId}")
+    @PreAuthorize("hasAuthority('order:delete') or hasAuthority('SCOPE_ADMIN')")
     public ResponseEntity<Map<String, String>> deleteOrder(@PathVariable UUID orderId) {
         orderService.deleteOrder(orderId);
         return ResponseEntity.ok(Map.of("message", "Pesanan berhasil dihapus"));

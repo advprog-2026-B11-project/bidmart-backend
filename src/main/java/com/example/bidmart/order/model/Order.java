@@ -35,8 +35,9 @@ public class Order {
     @Column(name = "dispute_reason")
     private String disputeReason;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private OrderStatus status;
 
     @Column(name = "tracking_number")
     private String trackingNumber;
@@ -44,7 +45,7 @@ public class Order {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public Order(UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount, String status) {
+    public Order(UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount, OrderStatus status) {
         this.listingId = listingId;
         this.buyerId = buyerId;
         this.sellerId = sellerId;
@@ -54,6 +55,11 @@ public class Order {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.status == null) {
+            this.status = OrderStatus.CREATED;
+        }
     }
 }

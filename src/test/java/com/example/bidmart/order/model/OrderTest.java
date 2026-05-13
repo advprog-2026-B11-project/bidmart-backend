@@ -19,13 +19,13 @@ class OrderTest {
         UUID buyerId = UUID.randomUUID();
         UUID sellerId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("100000");
-        Order order = new Order(listingId, buyerId, sellerId, amount, "CREATED");
+        Order order = new Order(listingId, buyerId, sellerId, amount, OrderStatus.CREATED);
 
         assertEquals(listingId, order.getListingId());
         assertEquals(buyerId, order.getBuyerId());
         assertEquals(sellerId, order.getSellerId());
         assertEquals(amount, order.getAmount());
-        assertEquals("CREATED", order.getStatus());
+        assertEquals(OrderStatus.CREATED, order.getStatus());
 
         UUID newId = UUID.randomUUID();
         UUID newListingId = UUID.randomUUID();
@@ -39,7 +39,7 @@ class OrderTest {
         order.setBuyerId(newBuyerId);
         order.setSellerId(newSellerId);
         order.setAmount(newAmount);
-        order.setStatus("PAID");
+        order.setStatus(OrderStatus.DELIVERED);
         order.setTrackingNumber("RESI-12345");
         order.setDisputeReason("Barang cacat");
         order.setCreatedAt(time);
@@ -49,7 +49,7 @@ class OrderTest {
         assertEquals(newBuyerId, order.getBuyerId());
         assertEquals(newSellerId, order.getSellerId());
         assertEquals(newAmount, order.getAmount());
-        assertEquals("PAID", order.getStatus());
+        assertEquals(OrderStatus.DELIVERED, order.getStatus());
         assertEquals("RESI-12345", order.getTrackingNumber());
         assertEquals("Barang cacat", order.getDisputeReason());
         assertEquals(time, order.getCreatedAt());
@@ -70,7 +70,7 @@ class OrderTest {
                 .buyerId(buyerId)
                 .sellerId(sellerId)
                 .amount(amount)
-                .status("COMPLETED")
+                .status(OrderStatus.DELIVERED)
                 .trackingNumber("RESI-999")
                 .disputeReason("Tidak sesuai deskripsi")
                 .createdAt(time)
@@ -81,7 +81,7 @@ class OrderTest {
         assertEquals(buyerId, order.getBuyerId());
         assertEquals(sellerId, order.getSellerId());
         assertEquals(amount, order.getAmount());
-        assertEquals("COMPLETED", order.getStatus());
+        assertEquals(OrderStatus.DELIVERED, order.getStatus());
         assertEquals("RESI-999", order.getTrackingNumber());
         assertEquals("Tidak sesuai deskripsi", order.getDisputeReason());
     }
@@ -95,5 +95,6 @@ class OrderTest {
         order.onCreate();
 
         assertNotNull(order.getCreatedAt());
+        assertEquals(OrderStatus.CREATED, order.getStatus());
     }
 }
