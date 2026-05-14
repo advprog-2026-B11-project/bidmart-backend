@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,4 +24,9 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
     Optional<Listing> findByIdWithLock(@Param("id") UUID id);
 
     List<Listing> findByStatusInAndEndTimeBefore(List<AuctionStatus> statuses, LocalDateTime time);
+    List<Listing> findByStatusIn(Collection<AuctionStatus> statuses);
+
+    default List<Listing> findActiveListings() {
+        return findByStatusIn(Arrays.asList(AuctionStatus.ACTIVE, AuctionStatus.EXTENDED));
+    }
 }
