@@ -19,17 +19,22 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private static final String LOGIN_PATH = "/api/auth/login";
     private static final String REGISTER_PATH = "/api/auth/register";
+    private static final String VERIFY_MFA_PATH = "/api/auth/verify-mfa";
 
     private final FixedWindowRateLimiter loginLimiter;
     private final FixedWindowRateLimiter registerLimiter;
+    private final FixedWindowRateLimiter verifyMfaLimiter;
 
     public AuthRateLimitFilter(
             @Value("${app.rate-limit.login.max-requests:5}") int loginMaxRequests,
             @Value("${app.rate-limit.login.window-seconds:60}") long loginWindowSeconds,
             @Value("${app.rate-limit.register.max-requests:3}") int registerMaxRequests,
-            @Value("${app.rate-limit.register.window-seconds:600}") long registerWindowSeconds) {
+            @Value("${app.rate-limit.register.window-seconds:600}") long registerWindowSeconds,
+            @Value("${app.rate-limit.verify-mfa.max-requests:5}") int verifyMfaMaxRequests,
+            @Value("${app.rate-limit.verify-mfa.window-seconds:60}") long verifyMfaWindowSeconds) {
         this.loginLimiter = new FixedWindowRateLimiter(loginMaxRequests, Duration.ofSeconds(loginWindowSeconds));
         this.registerLimiter = new FixedWindowRateLimiter(registerMaxRequests, Duration.ofSeconds(registerWindowSeconds));
+        this.verifyMfaLimiter = new FixedWindowRateLimiter(verifyMfaMaxRequests, Duration.ofSeconds(verifyMfaWindowSeconds));
     }
 
     @Override
@@ -45,6 +50,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             }
             if (REGISTER_PATH.equals(path)) {
                 handleRateLimit(request, response, filterChain, registerLimiter);
+                return;
+            }
+            if (VERIFY_MFA_PATH.equals(path)) {
+                handleRateLimit(request, response, filterChain, verifyMfaLimiter);
                 return;
             }
         }
