@@ -64,4 +64,12 @@ class NotificationPreferenceTest {
         assertTrue(preference.isPushEnabled());
         assertFalse(preference.isInAppEnabled());
     }
+
+    @Test
+    void testNotificationPreferenceBuilderDefaultValues() {
+        NotificationPreference pref = NotificationPreference.builder().build();
+
+        assertNotNull(pref.getMutedTypes());
+        assertTrue(pref.getMutedTypes().isEmpty());
+    }
 }

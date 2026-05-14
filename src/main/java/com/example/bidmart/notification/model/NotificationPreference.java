@@ -32,6 +32,7 @@ public class NotificationPreference {
     @Column(name = "in_app_enabled", nullable = false)
     private boolean inAppEnabled;
 
+    @Builder.Default
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "notification_muted_types", joinColumns = @JoinColumn(name = "preference_id"))
     @Column(name = "muted_type")
