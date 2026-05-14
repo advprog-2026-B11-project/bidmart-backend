@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/admin/users")
-@PreAuthorize("hasRole('ADMIN')") 
+@PreAuthorize("hasRole('ADMIN') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_DEACTIVATE)")
 @CrossOrigin(origins = "*")
 public class AdminUserController {
 

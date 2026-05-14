@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/roles")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ROLE_MANAGE)")
 public class RoleController {
 
     private final RoleRepository roleRepository;

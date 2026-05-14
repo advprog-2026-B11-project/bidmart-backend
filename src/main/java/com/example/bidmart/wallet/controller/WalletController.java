@@ -33,14 +33,14 @@ public class WalletController {
     }
 
     @PostMapping("/register")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_CREATE)")
     public ResponseEntity<Wallet> createWallet(@RequestBody CreateWalletRequest request) {
         Wallet wallet = walletService.createWallet(request.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(wallet);
     }
 
     @GetMapping("/balance")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_READ)")
     public ResponseEntity<Wallet> getBalance(Authentication authentication) {
         UUID userId = resolveCurrentUserId(authentication);
         Wallet wallet = walletService.getWalletByUserId(userId);
@@ -48,7 +48,7 @@ public class WalletController {
     }
 
     @GetMapping("/{userId}/balance")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_READ)")
     public ResponseEntity<Wallet> getBalance(
             @PathVariable UUID userId,
             Authentication authentication
@@ -58,7 +58,7 @@ public class WalletController {
     }
 
     @PostMapping("/{userId}/top-up")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_TOP_UP)")
     public ResponseEntity<WalletResponse> topUp(
             @PathVariable UUID userId,
             @RequestBody TopUpRequest request,
@@ -81,14 +81,14 @@ public class WalletController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/list")
+    @PreAuthorize("hasRole('ADMIN') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_LIST)")
     public ResponseEntity<List<Wallet>> getAllWallets() {
         return ResponseEntity.ok(walletService.findAll());
     }
 
     @PostMapping("/hold")
-    @PreAuthorize("hasRole('INTERNAL_SERVICE')")
+    @PreAuthorize("hasRole('INTERNAL_SERVICE') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_HOLD)")
     public ResponseEntity<WalletResponse> holdBalance(@RequestBody HoldBalanceRequest request) {
         if (request.getAmount() == null || request.getListingId() == null) {
             throw new InvalidRequestException("Amount dan listingId harus diisi.");
@@ -105,7 +105,7 @@ public class WalletController {
     }
 
     @PostMapping("/release")
-    @PreAuthorize("hasRole('INTERNAL_SERVICE')")
+    @PreAuthorize("hasRole('INTERNAL_SERVICE') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_RELEASE)")
     public ResponseEntity<WalletResponse> releaseHold(@RequestBody HoldBalanceRequest request) {
         if (request.getAmount() == null || request.getListingId() == null) {
             throw new InvalidRequestException("Amount dan listingId harus diisi.");
@@ -122,7 +122,7 @@ public class WalletController {
     }
 
     @PostMapping("/settle")
-    @PreAuthorize("hasRole('INTERNAL_SERVICE')")
+    @PreAuthorize("hasRole('INTERNAL_SERVICE') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_SETTLE)")
     public ResponseEntity<WalletResponse> settlePayment(@RequestBody HoldBalanceRequest request) {
         if (request.getAmount() == null || request.getListingId() == null) {
             throw new InvalidRequestException("Amount dan listingId harus diisi.");
@@ -139,7 +139,7 @@ public class WalletController {
     }
 
     @PostMapping("/withdraw")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_WITHDRAW)")
     public ResponseEntity<WalletResponse> withdraw(Authentication authentication, @RequestBody WithdrawRequest request) {
         UUID userId = resolveCurrentUserId(authentication);
 
@@ -151,7 +151,7 @@ public class WalletController {
     }
 
     @GetMapping("/transactions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_TRANSACTIONS_READ)")
     public ResponseEntity<List<TransactionResponse>> getTransactionHistory(Authentication authentication) {
         UUID userId = resolveCurrentUserId(authentication);
         List<Transaction> transactions = walletService.getTransactionHistory(userId);
@@ -164,7 +164,7 @@ public class WalletController {
     }
 
     @GetMapping("/transactions/{transactionId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_TRANSACTIONS_READ)")
     public ResponseEntity<TransactionResponse> getTransactionDetail(
             @PathVariable UUID transactionId,
             Authentication authentication
@@ -176,7 +176,7 @@ public class WalletController {
     }
 
     @PostMapping("/confirm-delivery")
-    @PreAuthorize("hasRole('INTERNAL_SERVICE')")
+    @PreAuthorize("hasRole('INTERNAL_SERVICE') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_CONFIRM_DELIVERY)")
     public ResponseEntity<WalletResponse> confirmDelivery(@RequestBody ConfirmDeliveryRequest request) {
         if (request.getSellerId() == null || request.getAmount() == null) {
             throw new InvalidRequestException("SellerId dan amount harus diisi.");

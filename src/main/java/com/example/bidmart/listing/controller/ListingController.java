@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,6 +25,7 @@ public class ListingController {
     }
 
     @PostMapping
+        @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_CREATE)")
     public ResponseEntity<Listing> createListing(
             @RequestBody Listing listing,
             Authentication authentication
@@ -34,11 +36,13 @@ public class ListingController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_READ)")
     public ResponseEntity<List<Listing>> getAllListings() {
         return ResponseEntity.ok(listingService.getAllListings());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_READ)")
     public ResponseEntity<Listing> getListingById(@PathVariable UUID id) {
         return listingService.getListingById(id)
                 .map(ResponseEntity::ok)
@@ -54,6 +58,7 @@ public class ListingController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_UPDATE)")
     public ResponseEntity<?> updateListing(@PathVariable UUID id, @RequestBody Listing listing) {
         try {
             Listing updated = listingService.updateListing(id, listing);
@@ -64,6 +69,7 @@ public class ListingController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_DELETE)")
     public ResponseEntity<?> deleteListing(@PathVariable UUID id) {
         try {
             listingService.deleteListing(id);

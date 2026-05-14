@@ -9,6 +9,7 @@ import com.example.bidmart.user.dto.UserProfileResponse;
 import com.example.bidmart.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -32,12 +33,14 @@ public class UserController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_READ)")
     public ResponseEntity<UserProfileResponse> getCurrentUser(Authentication authentication) {
         UserProfileResponse profile = userService.getCurrentUser(authentication.getName());
         return ResponseEntity.ok(profile);
     }
 
     @PutMapping("/me")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_UPDATE)")
     public ResponseEntity<UserProfileResponse> updateProfile(
             Authentication authentication,
             @RequestBody UpdateProfileRequest request) {
@@ -46,18 +49,21 @@ public class UserController {
     }
 
     @GetMapping("/me/mfa")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_READ)")
     public ResponseEntity<MfaStatusResponse> getMfaStatus(Authentication authentication) {
         MfaStatusResponse status = userService.getMfaStatus(authentication.getName());
         return ResponseEntity.ok(status);
     }
 
     @PostMapping("/me/mfa/setup")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_SETUP)")
     public ResponseEntity<MfaSetupResponse> setupMfa(Authentication authentication) {
         MfaSetupResponse response = userService.setupMfa(authentication.getName());
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/me/mfa/enable")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE)")
     public ResponseEntity<MfaStatusResponse> enableMfa(
             Authentication authentication,
             @Valid @RequestBody MfaEnableRequest request) {
@@ -66,12 +72,14 @@ public class UserController {
     }
 
     @PostMapping("/me/mfa/email/enable")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE_EMAIL)")
     public ResponseEntity<MfaStatusResponse> enableEmailMfa(Authentication authentication) {
         MfaStatusResponse status = userService.enableEmailMfa(authentication.getName());
         return ResponseEntity.ok(status);
     }
 
     @PostMapping("/me/mfa/disable")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_DISABLE)")
     public ResponseEntity<MfaStatusResponse> disableMfa(
             Authentication authentication,
             @Valid @RequestBody MfaDisableRequest request) {
@@ -83,6 +91,7 @@ public class UserController {
     }
 
     @DeleteMapping("/me")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_DELETE)")
     public ResponseEntity<Void> deleteProfile(Authentication authentication) {
         userService.deleteProfile(authentication.getName());
         return ResponseEntity.noContent().build();
