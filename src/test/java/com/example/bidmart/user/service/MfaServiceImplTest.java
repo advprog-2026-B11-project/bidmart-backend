@@ -21,7 +21,9 @@ class MfaServiceImplTest {
 
         TimeProvider timeProvider = new SystemTimeProvider();
         DefaultCodeGenerator codeGenerator = new DefaultCodeGenerator();
-        String code = codeGenerator.generate(secret, timeProvider.getTime());
+        long currentBucket = Math.floorDiv(timeProvider.getTime(), 30L);
+
+        String code = codeGenerator.generate(secret, currentBucket);
 
         assertTrue(mfaService.verifyCode(secret, code));
     }
