@@ -1,6 +1,7 @@
 package com.example.bidmart.config;
 
 import com.example.bidmart.user.service.JwtService;
+import com.example.bidmart.user.repository.SessionRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.UUID;
 
 
 @Component
@@ -22,10 +25,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final SessionRepository sessionRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService,
+                                   UserDetailsService userDetailsService,
+                                   SessionRepository sessionRepository) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.sessionRepository = sessionRepository;
     }
 
     @Override
@@ -46,11 +53,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             String username = jwtService.extractUsername(jwt);
+            UUID sessionId = jwtService.extractSessionId(jwt);
+
+            if (sessionId == null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
+                if (jwtService.isTokenValid(jwt, userDetails.getUsername()) && isSessionActive(sessionId)) {
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails, null, userDetails.getAuthorities());
@@ -63,5 +76,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isSessionActive(UUID sessionId) {
+        return sessionRepository.findByIdAndIsRevokedFalseAndExpiresAtAfter(sessionId, Instant.now())
+                .isPresent();
     }
 }

@@ -4,6 +4,7 @@ import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
 import com.example.bidmart.user.dto.MfaVerificationRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
+import com.example.bidmart.user.dto.SessionResponse;
 import com.example.bidmart.user.model.MfaMethod;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.Session;
@@ -141,10 +142,9 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse finalizeLogin(User user, String deviceInfo){
         sessionService.enforceSessionLimit(user, maxConcurrentSessions);
-        String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
-
-        sessionService.createSession(user, refreshToken, deviceInfo);
+        SessionResponse session = sessionService.createSession(user, refreshToken, deviceInfo);
+        String accessToken = jwtService.generateAccessToken(user, session.getId());
 
         return AuthResponse.builder()
             .accessToken(accessToken)
@@ -287,9 +287,9 @@ public class AuthServiceImpl implements AuthService {
 
         session.setRevoked(true);
         sessionRepository.save(session);
-        String newAccessToken = jwtService.generateAccessToken(user);
         String newRefreshToken = jwtService.generateRefreshToken(user);
-        sessionService.createSession(user, newRefreshToken, session.getDeviceInfo());
+        SessionResponse newSession = sessionService.createSession(user, newRefreshToken, session.getDeviceInfo());
+        String newAccessToken = jwtService.generateAccessToken(user, newSession.getId());
 
         return mapToAuthResponse(user, newAccessToken, newRefreshToken);
     }

@@ -3,6 +3,7 @@ package com.example.bidmart.user.service;
 import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
+import com.example.bidmart.user.dto.SessionResponse;
 import com.example.bidmart.user.model.MfaMethod;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.Session;
@@ -166,8 +167,16 @@ class AuthServiceImplTest {
         when(userRepository.findByEmail("testuser")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
         when(passwordEncoder.matches("password123", "encoded-password")).thenReturn(true);
-        when(jwtService.generateAccessToken(mockUser)).thenReturn("access-token");
         when(jwtService.generateRefreshToken(mockUser)).thenReturn("refresh-token");
+        UUID sessionId = UUID.randomUUID();
+        SessionResponse sessionResponse = SessionResponse.builder()
+            .id(sessionId)
+            .deviceInfo("Test Device")
+            .createdAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+        when(sessionService.createSession(mockUser, "refresh-token", "Test Device")).thenReturn(sessionResponse);
+        when(jwtService.generateAccessToken(mockUser, sessionId)).thenReturn("access-token");
 
         AuthResponse response = authService.login(request, "Test Device");
 
@@ -266,8 +275,16 @@ class AuthServiceImplTest {
         session.setDeviceInfo("Test Device");
 
         when(sessionRepository.findByRefreshToken(oldRefreshToken)).thenReturn(Optional.of(session));
-        when(jwtService.generateAccessToken(mockUser)).thenReturn("new-access-token");
         when(jwtService.generateRefreshToken(mockUser)).thenReturn("new-refresh-token");
+        UUID newSessionId = UUID.randomUUID();
+        SessionResponse newSession = SessionResponse.builder()
+            .id(newSessionId)
+            .deviceInfo("Test Device")
+            .createdAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+        when(sessionService.createSession(mockUser, "new-refresh-token", "Test Device")).thenReturn(newSession);
+        when(jwtService.generateAccessToken(mockUser, newSessionId)).thenReturn("new-access-token");
 
         AuthResponse response = authService.refreshToken(oldRefreshToken);
 
