@@ -82,13 +82,15 @@ public class ListingService {
     }
 
     public List<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice) {
-        List<Listing> allListings = listingRepository.findAll();
-        return allListings.stream()
-                .filter(listing -> keyword == null || keyword.isEmpty() || listing.getTitle().toLowerCase().contains(keyword.toLowerCase()) || listing.getDescription().toLowerCase().contains(keyword.toLowerCase()))
-                .filter(listing -> category == null || category.isEmpty() || listing.getCategoryId().toString().equals(category))
-                .filter(listing -> minPrice == null || listing.getStartingPrice().compareTo(minPrice) >= 0)
-                .filter(listing -> maxPrice == null || listing.getStartingPrice().compareTo(maxPrice) <= 0)
-                .toList();
+        UUID categoryId = null;
+        if (category != null && !category.isEmpty()) {
+            try {
+                categoryId = UUID.fromString(category);
+            } catch (IllegalArgumentException e) {
+                // Invalid UUID, ignore category filter
+            }
+        }
+        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
     }
 
     public List<Listing> getActiveListings() {
