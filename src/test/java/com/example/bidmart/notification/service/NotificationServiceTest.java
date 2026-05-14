@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,6 +56,7 @@ class NotificationServiceTest {
                 .emailEnabled(true)
                 .pushEnabled(true)
                 .inAppEnabled(true)
+                .mutedTypes(new HashSet<>())
                 .build();
     }
 
@@ -62,23 +64,77 @@ class NotificationServiceTest {
     void createNotification_defaultPreference_success() {
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.empty());
         when(preferenceRepository.save(any(NotificationPreference.class))).thenReturn(preference);
-        when(notificationRepository.save(any(Notification.class))).thenReturn(notification);
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
 
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
 
         assertNotNull(result);
         assertEquals(userId, result.getUserId());
+        assertEquals("DELIVERED", result.getDeliveryStatus());
         verify(notificationRepository, times(2)).save(any(Notification.class));
         verify(messagingTemplate, times(1)).convertAndSendToUser(eq(userId.toString()), eq("/queue/notifications"), any());
     }
 
     @Test
-    void createNotification_onlyPushEnabled_doesNotSaveToDb() {
+    void createNotification_typeIsMuted_returnsNull() {
+        preference.setMutedTypes(new HashSet<>(List.of("MUTED_TYPE")));
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+
+        Notification result = notificationService.createNotification(userId, "MUTED_TYPE", "Pesan ini di-mute");
+
+        assertNull(result);
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    }
+
+    @Test
+    void createNotification_pushThrowsException_deliveryStatusFailed() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
+        doThrow(new RuntimeException("WebSocket Error"))
+                .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
+
+        Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Pesan Error WS");
+
+        assertNotNull(result);
+        assertEquals("FAILED", result.getDeliveryStatus());
+        verify(notificationRepository, times(2)).save(any(Notification.class));
+    }
+
+    @Test
+    void createNotification_pushDisabled_doesNotSendWebSocket() {
+        preference.setPushEnabled(false);
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
+        Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Pesan Tanpa Push");
+
+        assertNotNull(result);
+        assertEquals("DELIVERED", result.getDeliveryStatus());
+        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    }
+
+    @Test
+    void updatePreference_withMutedTypes_success() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(preferenceRepository.save(any(NotificationPreference.class))).thenReturn(preference);
+
+        List<String> mutedTypes = List.of("PROMO", "SPAM");
+        NotificationPreference result = notificationService.updatePreference(userId, false, false, false, mutedTypes);
+
+        assertNotNull(result);
+        assertTrue(result.getMutedTypes().contains("PROMO"));
+        verify(preferenceRepository, times(1)).save(preference);
+    }
+
+    @Test
+    void createNotification_onlyPushEnabled_doesNotSaveToDbInitially() {
         preference.setInAppEnabled(false);
         preference.setPushEnabled(true);
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
 
-        when(notificationRepository.save(any(Notification.class))).thenReturn(notification);
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
 
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
 
@@ -103,7 +159,7 @@ class NotificationServiceTest {
     void getPreference_success() {
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
         NotificationPreference result = notificationService.getPreference(userId);
-        
+
         assertNotNull(result);
         assertEquals(userId, result.getUserId());
     }
