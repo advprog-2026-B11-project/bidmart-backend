@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Service
 public class ListingService {
@@ -78,5 +79,19 @@ public class ListingService {
         validateListingForUpdate(existing);
 
         listingRepository.delete(existing);
+    }
+
+    public List<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice) {
+        List<Listing> allListings = listingRepository.findAll();
+        return allListings.stream()
+                .filter(listing -> keyword == null || keyword.isEmpty() || listing.getTitle().toLowerCase().contains(keyword.toLowerCase()) || listing.getDescription().toLowerCase().contains(keyword.toLowerCase()))
+                .filter(listing -> category == null || category.isEmpty() || listing.getCategoryId().toString().equals(category))
+                .filter(listing -> minPrice == null || listing.getStartingPrice().compareTo(minPrice) >= 0)
+                .filter(listing -> maxPrice == null || listing.getStartingPrice().compareTo(maxPrice) <= 0)
+                .toList();
+    }
+
+    public List<Listing> getActiveListings() {
+        return listingRepository.findActiveListings();
     }
 }
