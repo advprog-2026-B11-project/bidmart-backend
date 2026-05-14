@@ -19,6 +19,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotBlank;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -38,7 +42,7 @@ public class Listing {
     @Column(name = "category_id", nullable = false)
     private UUID categoryId;
 
-    @Column(nullable = false)
+    @NotBlank @Column(nullable = false)
     private String title;
 
     private String description;
@@ -46,13 +50,13 @@ public class Listing {
     @Column(name = "image_url")
     private String imageUrl;
 
-    @Column(name = "starting_price", nullable = false)
+    @DecimalMin("0.01") @Column(name = "starting_price", nullable = false)
     private BigDecimal startingPrice;
 
-    @Column(name = "reserve_price")
+    @DecimalMin("0.01") @Column(name = "reserve_price")
     private BigDecimal reservePrice;
 
-    @Column(name = "end_time", nullable = false)
+    @Future @Column(name = "end_time", nullable = false)
     private LocalDateTime endTime;
 
     @Enumerated(EnumType.STRING)
