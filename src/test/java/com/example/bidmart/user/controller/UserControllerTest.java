@@ -74,6 +74,17 @@ class UserControllerTest {
     }
 
     @Test
+    void getCurrentUser_shouldReturnProfile() {
+        when(userService.getCurrentUser("alice")).thenReturn(profileResponse);
+
+        ResponseEntity<UserProfileResponse> response = userController.getCurrentUser(authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("alice", response.getBody().getUsername());
+        verify(userService, times(1)).getCurrentUser("alice");
+    }
+
+    @Test
     void deleteProfile_shouldReturnNoContent() {
         ResponseEntity<Void> response = userController.deleteProfile(authentication);
 

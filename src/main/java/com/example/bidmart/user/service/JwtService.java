@@ -4,6 +4,11 @@ import com.example.bidmart.user.model.User;
 import java.util.UUID;
 
 public interface JwtService {
+    @Deprecated
+    default String generateAccessToken(User user) {
+        throw new UnsupportedOperationException("Use generateAccessToken(user, sessionId)");
+    }
+
     String generateAccessToken(User user, UUID sessionId);
     String generateRefreshToken(User user);
     String extractUsername(String token);

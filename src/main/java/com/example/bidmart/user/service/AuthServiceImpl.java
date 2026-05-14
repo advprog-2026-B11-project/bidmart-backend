@@ -12,6 +12,7 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,8 @@ public class AuthServiceImpl implements AuthService {
 
     private static final int EMAIL_MFA_CODE_LENGTH = 6;
     private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
+    private static final long DEFAULT_EMAIL_MFA_TTL_SECONDS = 300L;
+    private static final int DEFAULT_MAX_CONCURRENT_SESSIONS = 3;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -42,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final long emailMfaCodeTtlSeconds;
     private final int maxConcurrentSessions;
 
+    @Autowired
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
                             PasswordEncoder passwordEncoder,
@@ -64,6 +68,29 @@ public class AuthServiceImpl implements AuthService {
         this.verificationUrlTemplate = verificationUrlTemplate;
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
         this.maxConcurrentSessions = maxConcurrentSessions;
+    }
+
+    @Deprecated
+    public AuthServiceImpl(UserRepository userRepository,
+                           SessionRepository sessionRepository,
+                           PasswordEncoder passwordEncoder,
+                           JwtService jwtService,
+                           SessionService sessionService,
+                           MfaService mfaService,
+                           RoleRepository roleRepository,
+                           EmailService emailService,
+                           String verificationUrlTemplate) {
+        this(userRepository,
+                sessionRepository,
+                passwordEncoder,
+                jwtService,
+                sessionService,
+                mfaService,
+                roleRepository,
+                emailService,
+                verificationUrlTemplate,
+                DEFAULT_EMAIL_MFA_TTL_SECONDS,
+                DEFAULT_MAX_CONCURRENT_SESSIONS);
     }
 
     @Override

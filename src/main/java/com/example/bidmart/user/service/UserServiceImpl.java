@@ -15,7 +15,9 @@ import com.example.bidmart.user.repository.UserRepository;
 import java.util.UUID;
 import java.time.Instant;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class UserServiceImpl implements UserService {
     private final MfaService mfaService;
     private final PasswordEncoder passwordEncoder;
 
+    @Autowired
     public UserServiceImpl(UserRepository userRepository,
                            SessionRepository sessionRepository,
                            ApplicationEventPublisher eventPublisher,
@@ -41,6 +44,14 @@ public class UserServiceImpl implements UserService {
         this.eventPublisher = eventPublisher;
         this.mfaService = mfaService;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    @Deprecated
+    public UserServiceImpl(UserRepository userRepository,
+                           SessionRepository sessionRepository,
+                           ApplicationEventPublisher eventPublisher,
+                           MfaService mfaService) {
+        this(userRepository, sessionRepository, eventPublisher, mfaService, new BCryptPasswordEncoder());
     }
 
     @Override
