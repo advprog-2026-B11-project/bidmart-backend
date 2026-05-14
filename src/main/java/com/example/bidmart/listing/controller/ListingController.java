@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.security.access.prepost.PreAuthorize;
 import java.math.BigDecimal;
+import jakarta.validation.Valid;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -29,7 +30,7 @@ public class ListingController {
 
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')") @PostMapping
     public ResponseEntity<Listing> createListing(
-            @RequestBody Listing listing,
+            @Valid @RequestBody Listing listing,
             Authentication authentication
     ) {
         UUID sellerId = resolveCurrentUserId(authentication);
@@ -75,7 +76,7 @@ public class ListingController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateListing(@PathVariable UUID id, @RequestBody Listing listing) {
+    public ResponseEntity<?> updateListing(@PathVariable UUID id, @Valid @RequestBody Listing listing) {
         try {
             Listing updated = listingService.updateListing(id, listing);
             return ResponseEntity.ok(updated);
