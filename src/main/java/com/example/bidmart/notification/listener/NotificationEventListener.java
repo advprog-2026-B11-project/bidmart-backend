@@ -4,6 +4,9 @@ import com.example.bidmart.common.event.AuctionWonEvent;
 import com.example.bidmart.common.event.BidPlacedEvent;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
 import com.example.bidmart.common.event.OutbidEvent;
+import com.example.bidmart.common.event.OrderRefundedEvent;
+import com.example.bidmart.common.event.AuctionClosedNoWinnerEvent;
+import com.example.bidmart.common.event.AuctionExtendedEvent;
 import com.example.bidmart.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
@@ -44,7 +47,28 @@ public class NotificationEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderDelivered(OrderDeliveredEvent event) {
-        String sellerMessage = "Pesanan (ID: " + event.getOrderId() + ") telah dikonfirmasi diterima oleh pembeli. Dana sebesar " + event.getAmount() + " sedang diteruskan ke dompet Anda.";
+        String sellerMessage = "Pesanan (ID: " + event.getOrderId() + ") telah dikonfirmasi diterima oleh pembeli. Dana sebesar Rp " + event.getAmount() + " sedang diteruskan ke dompet Anda.";
         notificationService.createNotification(event.getSellerId(), "ORDER_DELIVERED", sellerMessage);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleOrderRefunded(OrderRefundedEvent event) {
+        String message = "Sengketa pesanan (ID: " + event.getOrderId() + ") disetujui. Dana sebesar Rp " + event.getAmount() + " telah dikembalikan ke dompet Anda.";
+        notificationService.createNotification(event.getBuyerId(), "ORDER_REFUNDED", message);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleAuctionClosedNoWinner(AuctionClosedNoWinnerEvent event) {
+        String message = "Masa lelang untuk barang Anda (ID: " + event.listingId() + ") telah berakhir tanpa ada penawaran. Barang tidak terjual.";
+        notificationService.createNotification(event.sellerId(), "AUCTION_CLOSED_NO_WINNER", message);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleAuctionExtended(AuctionExtendedEvent event) {
+        String message = "Lelang barang Anda (ID: " + event.listingId() + ") otomatis diperpanjang karena ada penawaran di menit terakhir!";
+        notificationService.createNotification(event.sellerId(), "AUCTION_EXTENDED", message);
     }
 }

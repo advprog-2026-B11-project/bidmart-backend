@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public record AuctionClosedNoWinnerEvent(
         UUID listingId,
-        String reason
+        UUID sellerId
 ) {}
