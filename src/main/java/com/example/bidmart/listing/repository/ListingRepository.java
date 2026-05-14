@@ -29,4 +29,6 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
     default List<Listing> findActiveListings() {
         return findByStatusIn(Arrays.asList(AuctionStatus.ACTIVE, AuctionStatus.EXTENDED));
     }
+
+    List<Listing> findBySellerIdAndStatusIn(UUID sellerId, List<AuctionStatus> statuses);
 }
