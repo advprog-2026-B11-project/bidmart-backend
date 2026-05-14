@@ -31,17 +31,33 @@ public class Notification {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
+    @Builder.Default
     @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Builder.Default
+    @Column(name = "delivery_status")
+    private String deliveryStatus = "PENDING";
+
     public Notification(UUID userId, String type, String message) {
         this.userId = userId;
         this.type = type;
         this.message = message;
         this.isRead = false;
+        this.deliveryStatus = "PENDING";
+    }
+
+    public Notification(UUID id, UUID userId, String type, String message, boolean isRead, LocalDateTime createdAt) {
+        this.id = id;
+        this.userId = userId;
+        this.type = type;
+        this.message = message;
+        this.isRead = isRead;
+        this.createdAt = createdAt;
+        this.deliveryStatus = "PENDING";
     }
 
     @PrePersist
