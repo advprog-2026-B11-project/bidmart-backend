@@ -1,5 +1,6 @@
 package com.example.bidmart.user.service;
 
+import com.example.bidmart.common.event.UserRegisteredEvent;
 import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
 import com.example.bidmart.user.dto.MfaVerificationRequest;
@@ -10,6 +11,7 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ public class AuthServiceImpl implements AuthService {
     private final SessionService sessionService;
     private final MfaService mfaService;
     private final RoleRepository roleRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
@@ -35,7 +38,8 @@ public class AuthServiceImpl implements AuthService {
                             JwtService jwtService,
                             SessionService sessionService,
                             MfaService mfaService,
-                            RoleRepository roleRepository) {
+                            RoleRepository roleRepository,
+                            ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
@@ -43,6 +47,7 @@ public class AuthServiceImpl implements AuthService {
         this.sessionService = sessionService;
         this.mfaService = mfaService;
         this.roleRepository = roleRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -64,6 +69,10 @@ public class AuthServiceImpl implements AuthService {
         user.setVerificationToken(verificationToken);
 
         User savedUser = userRepository.save(user);
+
+        eventPublisher.publishEvent(
+                new UserRegisteredEvent(savedUser.getId(), savedUser.getUsername(), java.time.Instant.now())
+        );
 
         return mapToAuthResponse(savedUser, null, null);
     }
