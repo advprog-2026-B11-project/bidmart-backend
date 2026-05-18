@@ -56,7 +56,7 @@ public class SecurityConfig {
                 // User endpoints wallet
                 .requestMatchers("/api/wallet/**").authenticated()
                 
-                .requestMatchers("/listings/**").permitAll()
+                .requestMatchers("/api/listings/**").permitAll()
                 .requestMatchers("/api/bids/mocks/**").permitAll()
                 .requestMatchers("/api/bids/**").permitAll()
                 .requestMatchers("/api/orders/**").authenticated()

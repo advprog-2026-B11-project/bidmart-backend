@@ -123,7 +123,7 @@ public class BidService {
                         new OutbidEvent(savedBid.getListingId(), outbid.getBuyerId(), savedBid.getAmount())));
 
         eventPublisher.publishEvent(new BidPlacedEvent(
-            java.util.UUID.randomUUID(),
+            savedBid.getId(),
             savedBid.getListingId(),
             savedBid.getBuyerId(),
             savedBid.getAmount()
