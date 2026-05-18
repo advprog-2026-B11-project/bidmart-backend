@@ -6,14 +6,46 @@
     "version": "2.0.0"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
-    { "key": "token", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" },
-    { "key": "listingId", "value": "", "type": "string" },
-    { "key": "userId", "value": "", "type": "string" },
-    { "key": "notificationId", "value": "", "type": "string" },
-    { "key": "orderId", "value": "", "type": "string" },
-    { "key": "sessionId", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "listingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -44,15 +76,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"displayName\": \"Test User\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
             },
             "description": "Daftarkan akun baru. Token otomatis tersimpan ke collection variable 'token'."
           }
@@ -75,15 +118,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"seller01\",\n  \"email\": \"seller01@example.com\",\n  \"displayName\": \"Seller Satu\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
             },
             "description": "Register akun seller terpisah. Gunakan untuk buat listing lelang."
           }
@@ -114,15 +168,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"identifier\": \"testuser\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
             },
             "description": "Login dengan username atau email. Token JWT otomatis tersimpan.\nJika MFA aktif, response berisi tempToken — gunakan endpoint Verify MFA."
           }
@@ -150,15 +215,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"identifier\": \"seller01\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
             },
             "description": "Login sebagai seller. Token seller tersimpan — gunakan untuk buat listing."
           }
@@ -167,15 +243,26 @@
           "name": "Verify MFA",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tempToken\": \"{{token}}\",\n  \"code\": \"123456\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/verify-mfa",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "verify-mfa"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-mfa"
+              ]
             },
             "description": "Verifikasi kode MFA (TOTP/email). Gunakan setelah login jika mfaRequired=true.\ntempToken dari response login sudah tersimpan di variabel 'token'."
           }
@@ -200,15 +287,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/refresh",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "refresh"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
             },
             "description": "Perbarui access token menggunakan refresh token. Token baru otomatis tersimpan."
           }
@@ -220,9 +318,20 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/auth/verify?token=EMAIL_VERIFICATION_TOKEN_HERE",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "verify"],
-              "query": [{ "key": "token", "value": "EMAIL_VERIFICATION_TOKEN_HERE" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "EMAIL_VERIFICATION_TOKEN_HERE"
+                }
+              ]
             },
             "description": "Verifikasi email dengan token yang dikirim ke email. Ganti token dengan yang diterima."
           }
@@ -253,11 +362,22 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/users/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "users", "me"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
             },
             "description": "Ambil profil user yang sedang login. userId otomatis tersimpan ke variabel."
           }
@@ -267,8 +387,14 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -276,8 +402,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/users/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "users", "me"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
             },
             "description": "Update profil user yang sedang login."
           }
@@ -286,11 +418,22 @@
           "name": "Delete My Account",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/users/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "users", "me"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
             },
             "description": "⚠️ Hapus akun sendiri. Tidak bisa di-undo!"
           }
@@ -322,11 +465,21 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/sessions",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "sessions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions"
+              ]
             },
             "description": "Lihat semua sesi aktif. SessionId pertama otomatis tersimpan ke variabel."
           }
@@ -335,11 +488,22 @@
           "name": "Revoke Session",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/sessions/{{sessionId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "sessions", "{{sessionId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sessions",
+                "{{sessionId}}"
+              ]
             },
             "description": "Cabut sesi tertentu. Gunakan sessionId dari endpoint Get My Sessions."
           }
@@ -355,8 +519,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -364,8 +534,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/wallet/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "wallet", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "wallet",
+                "register"
+              ]
             },
             "description": "Buat wallet untuk user. Jalankan Get My Profile dulu untuk mendapatkan userId."
           }
@@ -374,11 +550,22 @@
           "name": "Get Balance",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/wallet/balance",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "wallet", "balance"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "wallet",
+                "balance"
+              ]
             },
             "description": "Cek saldo wallet (balanceAvailable dan balanceLocked)."
           }
@@ -388,8 +575,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -397,8 +590,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/wallet/{{userId}}/top-up",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "wallet", "{{userId}}", "top-up"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "wallet",
+                "{{userId}}",
+                "top-up"
+              ]
             },
             "description": "Top up saldo wallet sebesar amount. Jalankan Get My Profile dulu untuk userId."
           }
@@ -408,8 +608,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -417,8 +623,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/wallet/withdraw",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "wallet", "withdraw"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "wallet",
+                "withdraw"
+              ]
             },
             "description": "Tarik saldo dari wallet ke rekening bank."
           }
@@ -427,11 +639,22 @@
           "name": "Get Transaction History",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/wallet/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "wallet", "transactions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "wallet",
+                "transactions"
+              ]
             },
             "description": "Lihat riwayat semua transaksi wallet (TOPUP, HOLD, REFUND, PAYMENT, WITHDRAWAL)."
           }
@@ -441,8 +664,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -450,8 +679,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/wallet/confirm-delivery",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "wallet", "confirm-delivery"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "wallet",
+                "confirm-delivery"
+              ]
             },
             "description": "Konfirmasi pengiriman barang — dana masuk ke wallet seller."
           }
@@ -460,11 +695,22 @@
           "name": "[Admin] Get All Wallets",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/wallet/list",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "wallet", "list"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "wallet",
+                "list"
+              ]
             },
             "description": "⚠️ Hanya untuk ADMIN. Lihat semua wallet di sistem."
           }
@@ -498,8 +744,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -507,8 +759,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/listings",
-              "host": ["{{baseUrl}}"],
-              "path": ["listings"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "listings"
+              ]
             },
             "description": "Buat listing lelang baru sebagai seller. ListingId otomatis tersimpan ke variabel.\nPastikan sudah login sebagai seller dan endTime lebih dari sekarang."
           }
@@ -536,8 +792,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -545,8 +807,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/listings",
-              "host": ["{{baseUrl}}"],
-              "path": ["listings"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "listings"
+              ]
             },
             "description": "Buat listing yang hampir expire untuk test anti-sniping.\nUbah endTime ke 1-2 menit dari sekarang, lalu langsung bid."
           }
@@ -558,8 +824,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/listings",
-              "host": ["{{baseUrl}}"],
-              "path": ["listings"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "listings"
+              ]
             },
             "description": "Ambil semua listing. Tidak perlu auth."
           }
@@ -571,8 +841,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/listings/{{listingId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["listings", "{{listingId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "listings",
+                "{{listingId}}"
+              ]
             },
             "description": "Ambil detail listing. Cek status, currentHighestBid, endTime."
           }
@@ -582,8 +857,14 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -591,8 +872,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/listings/{{listingId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["listings", "{{listingId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "listings",
+                "{{listingId}}"
+              ]
             },
             "description": "Update listing. Hanya bisa saat status DRAFT atau belum ada bid."
           }
@@ -601,11 +887,21 @@
           "name": "Delete Listing",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/listings/{{listingId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["listings", "{{listingId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "listings",
+                "{{listingId}}"
+              ]
             },
             "description": "Hapus listing. Hanya bisa saat tidak ada bid aktif."
           }
@@ -643,8 +939,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -652,8 +954,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/bids",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bids"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bids"
+              ]
             },
             "description": "Tempatkan bid. Pastikan amount > startingPrice dan > currentHighestBid.\nResponse 201 = sukses, 409 = race condition, 422 = saldo kurang, 400 = validasi gagal."
           }
@@ -677,8 +984,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -686,8 +999,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/bids",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bids"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bids"
+              ]
             },
             "description": "Proxy bid: sistem otomatis bid sampai proxyMaxLimit.\nDana yang di-hold = proxyMaxLimit, bukan amount."
           }
@@ -696,11 +1014,23 @@
           "name": "Get Bids By Listing",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/bids/listing/{{listingId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bids", "listing", "{{listingId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bids",
+                "listing",
+                "{{listingId}}"
+              ]
             },
             "description": "Lihat semua bid pada listing, diurutkan dari terbaru."
           }
@@ -709,11 +1039,24 @@
           "name": "Get Highest Bid",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/bids/listing/{{listingId}}/highest",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bids", "listing", "{{listingId}}", "highest"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bids",
+                "listing",
+                "{{listingId}}",
+                "highest"
+              ]
             },
             "description": "Cek bid tertinggi saat ini pada listing."
           }
@@ -722,11 +1065,24 @@
           "name": "Get Minimum Next Bid",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/bids/listing/{{listingId}}/minimum-bid",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bids", "listing", "{{listingId}}", "minimum-bid"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bids",
+                "listing",
+                "{{listingId}}",
+                "minimum-bid"
+              ]
             },
             "description": "Cek minimum bid yang diperbolehkan selanjutnya (berdasarkan EnglishAuctionStrategy)."
           }
@@ -735,11 +1091,22 @@
           "name": "Get My Bids",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/bids/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bids", "me"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bids",
+                "me"
+              ]
             },
             "description": "Lihat semua bid yang pernah saya tempatkan."
           }
@@ -774,11 +1141,23 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/notifications/user/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "notifications", "user", "{{userId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "user",
+                "{{userId}}"
+              ]
             },
             "description": "Ambil semua notifikasi. Jalankan Get My Profile dulu untuk userId.\nTipe notifikasi: NEW_BID, OUTBID, AUCTION_WON."
           }
@@ -787,11 +1166,24 @@
           "name": "Get Unread Notifications",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/notifications/user/{{userId}}/unread",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "notifications", "user", "{{userId}}", "unread"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "user",
+                "{{userId}}",
+                "unread"
+              ]
             },
             "description": "Ambil notifikasi yang belum dibaca saja."
           }
@@ -800,11 +1192,23 @@
           "name": "Mark As Read",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "notifications", "{{notificationId}}", "read"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{notificationId}}",
+                "read"
+              ]
             },
             "description": "Tandai notifikasi sebagai sudah dibaca."
           }
@@ -813,11 +1217,24 @@
           "name": "Mark All As Read",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/notifications/user/{{userId}}/read-all",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "notifications", "user", "{{userId}}", "read-all"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "user",
+                "{{userId}}",
+                "read-all"
+              ]
             },
             "description": "Tandai semua notifikasi sebagai sudah dibaca."
           }
@@ -826,11 +1243,22 @@
           "name": "Delete Notification",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/notifications/{{notificationId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "notifications", "{{notificationId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{notificationId}}"
+              ]
             },
             "description": "Hapus notifikasi tertentu."
           }
@@ -840,8 +1268,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -849,8 +1283,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/notifications/test-create",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "notifications", "test-create"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "test-create"
+              ]
             },
             "description": "Buat notifikasi manual untuk testing. Tidak perlu tunggu event dari bidding."
           }
@@ -885,11 +1325,23 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/orders/buyer/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "buyer", "{{userId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "buyer",
+                "{{userId}}"
+              ]
             },
             "description": "Lihat semua order sebagai buyer. OrderId pertama otomatis tersimpan.\nOrder terbuat otomatis saat memenangkan lelang."
           }
@@ -899,8 +1351,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -908,8 +1366,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/{{orderId}}/status",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "{{orderId}}", "status"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{orderId}}",
+                "status"
+              ]
             },
             "description": "Update status order. Status yang umum: CREATED → CONFIRMED → SHIPPED → DELIVERED."
           }
@@ -919,8 +1384,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -928,8 +1399,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/{{orderId}}/tracking",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "{{orderId}}", "tracking"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{orderId}}",
+                "tracking"
+              ]
             },
             "description": "Seller input nomor resi pengiriman. Status otomatis jadi SHIPPED."
           }
@@ -939,8 +1417,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -948,8 +1432,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/orders/test-create",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "test-create"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "test-create"
+              ]
             },
             "description": "Buat order manual untuk testing. Tidak perlu tunggu auction selesai."
           }
@@ -958,11 +1448,22 @@
           "name": "Delete Order",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/orders/{{orderId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "orders", "{{orderId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{orderId}}"
+              ]
             },
             "description": "Hapus order."
           }
@@ -980,8 +1481,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/listings",
-              "host": ["{{baseUrl}}"],
-              "path": ["listings"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "listings"
+              ]
             },
             "description": "=== HAPPY PATH FLOW ===\n\nUrutan untuk test lengkap:\n\n1. Auth > Register (buyer)\n2. Auth > Register (Seller)\n3. Auth > Login (Seller) → token seller tersimpan\n4. User > Get My Profile → userId seller tersimpan\n5. Wallet > Create Wallet\n6. Listing > Create Listing → listingId tersimpan\n7. Auth > Login (buyer) → token buyer tersimpan\n8. User > Get My Profile → userId buyer tersimpan\n9. Wallet > Create Wallet\n10. Wallet > Top Up (10jt)\n11. Bidding > Get Minimum Next Bid → cek minimum\n12. Bidding > Place Bid (amount > startingPrice)\n13. Notification > Get My Notifications → cek NEW_BID muncul\n14. Wallet > Get Balance → cek balanceLocked bertambah\n15. Tunggu auction expire ATAU ubah endTime ke masa lalu\n16. Order > Get My Orders → cek order terbuat otomatis\n17. Notification > Get My Notifications → cek AUCTION_WON muncul\n18. Wallet > Get Balance → cek balanceLocked berkurang (settled)\n\n=== ANTI-SNIPING TEST ===\n1. Login seller → buat listing endTime 1-2 menit dari sekarang\n2. Login buyer → bid sebelum waktu habis\n3. Get Listing By ID → cek endTime bertambah 2 menit & status EXTENDED\n\n=== OUTBID TEST ===\n1. Buyer A bid 5.5jt\n2. Login Buyer B → bid 6jt\n3. Get Notifications Buyer A → cek OUTBID muncul\n4. Get Balance Buyer A → cek hold di-release"
           }

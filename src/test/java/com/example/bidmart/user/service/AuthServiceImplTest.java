@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
@@ -43,6 +44,8 @@ class AuthServiceImplTest {
     private MfaService mfaService;
     @Mock
     private RoleRepository roleRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private AuthServiceImpl authService;
 
@@ -68,7 +71,8 @@ class AuthServiceImplTest {
                 jwtService,
                 sessionService,
                 mfaService,
-                roleRepository 
+                roleRepository,
+                eventPublisher
         );
     }
 

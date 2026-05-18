@@ -12,16 +12,16 @@ public interface WalletService {
     Wallet createWallet(UUID userId);
     Wallet getWalletByUserId(UUID userId);
     List<Wallet> findAll();
-    
+
     Wallet topUp(UUID userId, TopUpRequest request);
     Wallet withdraw(UUID userId, WithdrawRequest request);
-    
+
     // Bidding
     Wallet reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal reserveTarget);
     Wallet reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal reserveTarget, String idempotencyKey);
     Wallet releaseBidFunds(UUID buyerId, UUID listingId, BigDecimal releaseAmount);
     Wallet releaseBidFunds(UUID buyerId, UUID listingId, BigDecimal releaseAmount, String idempotencyKey);
-    
+
     // Settlement & Audit
     Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId);
     Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId, String idempotencyKey);
@@ -29,4 +29,7 @@ public interface WalletService {
     Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId, String idempotencyKey);
     List<Transaction> getTransactionHistory(UUID userId);
     Transaction getTransactionById(UUID transactionId, UUID userId);
+
+    // User Deactivation 
+    void releaseAllHoldsForUser(UUID userId);
 }
