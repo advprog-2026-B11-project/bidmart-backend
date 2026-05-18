@@ -142,4 +142,54 @@ class ListingControllerTest {
             listingController.createListing(listing, null);
         });
     }
+
+    @Test
+    void searchListings_shouldReturnListings() {
+        when(listingService.searchListings("test", null, null, null))
+                .thenReturn(List.of(listing));
+
+        ResponseEntity<List<Listing>> response = listingController.searchListings("test", null, null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().size());
+    }
+
+    @Test
+    void searchListings_shouldReturnEmptyList() {
+        when(listingService.searchListings("nonexistent", null, null, null))
+                .thenReturn(List.of());
+
+        ResponseEntity<List<Listing>> response = listingController.searchListings("nonexistent", null, null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(0, response.getBody().size());
+    }
+
+    @Test
+    void getActiveListings_shouldReturnOnlyActiveListings() {
+        Listing activeListing = new Listing();
+        activeListing.setId(UUID.randomUUID());
+        activeListing.setTitle("Active Auction");
+        activeListing.setStartingPrice(new BigDecimal("100"));
+        activeListing.setEndTime(LocalDateTime.now().plusHours(2));
+        activeListing.setStatus(AuctionStatus.ACTIVE);
+
+        when(listingService.getActiveListings()).thenReturn(List.of(activeListing));
+
+        ResponseEntity<List<Listing>> response = listingController.getActiveListings();
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().size());
+        assertEquals(AuctionStatus.ACTIVE, response.getBody().get(0).getStatus());
+    }
+
+    @Test
+    void getActiveListings_shouldReturnEmptyWhenNoActiveListings() {
+        when(listingService.getActiveListings()).thenReturn(List.of());
+
+        ResponseEntity<List<Listing>> response = listingController.getActiveListings();
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(0, response.getBody().size());
+    }
 }

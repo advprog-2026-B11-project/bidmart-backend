@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Service
 public class ListingService {
@@ -78,5 +79,21 @@ public class ListingService {
         validateListingForUpdate(existing);
 
         listingRepository.delete(existing);
+    }
+
+    public List<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice) {
+        UUID categoryId = null;
+        if (category != null && !category.isEmpty()) {
+            try {
+                categoryId = UUID.fromString(category);
+            } catch (IllegalArgumentException e) {
+                // Invalid UUID, ignore category filter
+            }
+        }
+        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
+    }
+
+    public List<Listing> getActiveListings() {
+        return listingRepository.findActiveListings();
     }
 }
