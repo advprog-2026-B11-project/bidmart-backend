@@ -1,9 +1,10 @@
 package com.example.bidmart.bidding.controller;
 
 import com.example.bidmart.bidding.dto.ErrorResponse;
+import com.example.bidmart.bidding.exception.BidConflictException;
 import com.example.bidmart.bidding.exception.BidValidationException;
-import com.example.bidmart.bidding.exception.InsufficientBalanceException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
+import com.example.bidmart.wallet.exception.InsufficientBalanceException;
 import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(basePackageClasses = {BidController.class})
 public class BidControllerAdvice {
+
+    @ExceptionHandler(BidConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(BidConflictException ex) {
+        return buildResponse(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage());
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {

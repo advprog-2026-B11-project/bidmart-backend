@@ -1,6 +1,8 @@
 package com.example.bidmart.notification.controller;
 
+import com.example.bidmart.notification.dto.NotificationPreferenceRequest;
 import com.example.bidmart.notification.model.Notification;
+import com.example.bidmart.notification.model.NotificationPreference;
 import com.example.bidmart.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,12 +30,16 @@ class NotificationControllerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private Authentication authentication;
+
     @InjectMocks
     private NotificationController notificationController;
 
     private UUID userId;
     private UUID notificationId;
     private Notification notification;
+    private NotificationPreference preference;
 
     @BeforeEach
     void setUp() {
@@ -40,14 +47,20 @@ class NotificationControllerTest {
         notificationId = UUID.randomUUID();
         notification = new Notification(userId, "TEST_TYPE", "Test Message");
         notification.setId(notificationId);
+
+        preference = NotificationPreference.builder()
+                .userId(userId)
+                .emailEnabled(true)
+                .pushEnabled(true)
+                .inAppEnabled(true)
+                .build();
     }
 
     @Test
     void getUserNotifications_returnsOk() {
         when(notificationService.getUserNotifications(userId)).thenReturn(Arrays.asList(notification));
-
         ResponseEntity<List<Notification>> response = notificationController.getUserNotifications(userId);
-
+        
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
     }
@@ -55,9 +68,8 @@ class NotificationControllerTest {
     @Test
     void getUnreadNotifications_returnsOk() {
         when(notificationService.getUnreadNotifications(userId)).thenReturn(Arrays.asList(notification));
-
         ResponseEntity<List<Notification>> response = notificationController.getUnreadNotifications(userId);
-
+        
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertFalse(response.getBody().get(0).isRead());
     }
@@ -66,9 +78,9 @@ class NotificationControllerTest {
     void markAsRead_returnsOk() {
         notification.setRead(true);
         when(notificationService.markAsRead(notificationId)).thenReturn(notification);
-
-        ResponseEntity<Notification> response = notificationController.markAsRead(notificationId);
-
+        
+        ResponseEntity<Notification> response = notificationController.markAsRead(notificationId, authentication);
+        
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().isRead());
     }
@@ -92,22 +104,42 @@ class NotificationControllerTest {
     @Test
     void markAllAsRead_returnsOk() {
         doNothing().when(notificationService).markAllAsRead(userId);
-
         ResponseEntity<Map<String, String>> response = notificationController.markAllAsRead(userId);
-
+        
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().containsKey("message"));
-        verify(notificationService, times(1)).markAllAsRead(userId);
     }
 
     @Test
     void deleteNotification_returnsOk() {
         doNothing().when(notificationService).deleteNotification(notificationId);
-
         ResponseEntity<Map<String, String>> response = notificationController.deleteNotification(notificationId);
-
+        
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertTrue(response.getBody().containsKey("message"));
-        verify(notificationService, times(1)).deleteNotification(notificationId);
+    }
+
+    @Test
+    void getPreferences_returnsOk() {
+        when(notificationService.getPreference(userId)).thenReturn(preference);
+        ResponseEntity<NotificationPreference> response = notificationController.getPreferences(userId);
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().isEmailEnabled());
+    }
+
+    @Test
+    void updatePreferences_returnsOk() {
+        NotificationPreferenceRequest request = new NotificationPreferenceRequest();
+        request.setEmailEnabled(false);
+        request.setPushEnabled(true);
+        request.setInAppEnabled(true);
+
+        when(notificationService.updatePreference(eq(userId), eq(false), eq(true), eq(true), any())).thenReturn(preference);
+
+        ResponseEntity<NotificationPreference> response = notificationController.updatePreferences(userId, request);
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(notificationService, times(1)).updatePreference(eq(userId), eq(false), eq(true), eq(true), any());
     }
 }

@@ -4,9 +4,11 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.UserRepository;
 import com.example.bidmart.wallet.dto.*;
 import com.example.bidmart.wallet.exception.*;
+import com.example.bidmart.wallet.model.PaymentMethod;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.service.WalletService;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +23,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,12 +53,14 @@ class WalletControllerTest {
     private UUID userId;
     private UUID listingId;
     private Wallet wallet;
+    private String idempotencyKey;
     private static final String USERNAME = "testuser";
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
         listingId = UUID.randomUUID();
+        idempotencyKey = UUID.randomUUID().toString();
         wallet = new Wallet(userId);
         wallet.setBalanceAvailable(new BigDecimal("100000"));
 
@@ -121,27 +127,55 @@ class WalletControllerTest {
     @Test
     void topUp_success() {
         wallet.setBalanceAvailable(new BigDecimal("150000"));
-        when(walletService.topUp(eq(userId), any())).thenReturn(wallet);
 
-        ResponseEntity<Wallet> response = walletController.topUp(
-                userId, new TopUpRequest(new BigDecimal("50000")), authentication);
+        Map<String, String> paymentDetails = new HashMap<>();
+        paymentDetails.put("bankName", "BCA");
+        paymentDetails.put("accountNumber", "1234567890");
+
+        TopUpRequest request = new TopUpRequest(
+                new BigDecimal("50000"), 
+                PaymentMethod.BANK, 
+                paymentDetails, 
+                idempotencyKey
+        );
+
+
+        when(walletService.topUp(eq(userId), any(TopUpRequest.class))).thenReturn(wallet);
+
+        ResponseEntity<WalletResponse> response = walletController.topUp(
+                userId, request, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals(new BigDecimal("150000"), response.getBody().getBalanceAvailable());
     }
 
     @Test
     void topUp_unauthenticated_throwsUnauthorized() {
+        TopUpRequest request = new TopUpRequest(
+                new BigDecimal("50000"), 
+                PaymentMethod.BANK, 
+                new HashMap<>(),
+                idempotencyKey
+        );
+
         assertThrows(UnauthorizedException.class,
-                () -> walletController.topUp(userId, new TopUpRequest(new BigDecimal("50000")), null));
+                () -> walletController.topUp(userId, request, null));
     }
 
     @Test
     void topUp_nullResult_returnsBadRequest() {
-        when(walletService.topUp(eq(userId), any())).thenReturn(null);
+        when(walletService.topUp(eq(userId), any(TopUpRequest.class))).thenReturn(null);
 
-        ResponseEntity<Wallet> response = walletController.topUp(
-                userId, new TopUpRequest(new BigDecimal("-1")), authentication);
+        TopUpRequest request = new TopUpRequest(
+                new BigDecimal("-1"), 
+                PaymentMethod.BANK, 
+                new HashMap<>(), 
+                idempotencyKey
+        );
+
+        ResponseEntity<WalletResponse> response = walletController.topUp(
+                userId, request, authentication);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
@@ -150,8 +184,15 @@ class WalletControllerTest {
     void topUp_forbidden_whenDifferentUser() {
         UUID otherUserId = UUID.randomUUID();
 
+        TopUpRequest request = new TopUpRequest(
+                new BigDecimal("50000"), 
+                PaymentMethod.BANK, 
+                new HashMap<>(), 
+                idempotencyKey
+        );
+
         assertThrows(ResponseStatusException.class,
-                () -> walletController.topUp(otherUserId, new TopUpRequest(new BigDecimal("50000")), authentication));
+                () -> walletController.topUp(otherUserId, request, authentication));
     }
 
     // === getAllWallets ===
@@ -170,12 +211,18 @@ class WalletControllerTest {
 
     @Test
     void holdBalance_success() {
+        BigDecimal amount = new BigDecimal("30000");
         wallet.setBalanceAvailable(new BigDecimal("70000"));
-        wallet.setBalanceLocked(new BigDecimal("30000"));
-        when(walletService.reserveBidFunds(eq(userId), eq(listingId), any())).thenReturn(wallet);
+        wallet.setBalanceLocked(amount);
+        when(walletService.reserveBidFunds(eq(userId), eq(listingId), any(), eq(idempotencyKey))).thenReturn(wallet);
 
-        HoldBalanceRequest request = new HoldBalanceRequest(new BigDecimal("30000"), listingId);
-        ResponseEntity<Wallet> response = walletController.holdBalance(authentication, request);
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId); 
+        request.setAmount(amount);
+        request.setListingId(listingId);
+        request.setIdempotencyKey(idempotencyKey);
+
+        ResponseEntity<WalletResponse> response = walletController.holdBalance(request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(new BigDecimal("30000"), response.getBody().getBalanceLocked());
@@ -183,61 +230,105 @@ class WalletControllerTest {
 
     @Test
     void holdBalance_insufficientBalance_throwsException() {
-        when(walletService.reserveBidFunds(eq(userId), eq(listingId), any()))
+        BigDecimal amount = new BigDecimal("999999");
+        when(walletService.reserveBidFunds(eq(userId), eq(listingId), eq(amount), eq(idempotencyKey)))
                 .thenThrow(new InsufficientBalanceException("Saldo tidak mencukupi."));
 
-        HoldBalanceRequest request = new HoldBalanceRequest(new BigDecimal("999999"), listingId);
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId); 
+        request.setAmount(amount);
+        request.setListingId(listingId);
+        request.setIdempotencyKey(idempotencyKey);
 
         assertThrows(InsufficientBalanceException.class,
-                () -> walletController.holdBalance(authentication, request));
+                () -> walletController.holdBalance(request));
     }
 
     // === releaseHold ===
 
     @Test
     void releaseHold_success() {
+        BigDecimal amount = new BigDecimal("30000");
         wallet.setBalanceLocked(BigDecimal.ZERO);
-        when(walletService.releaseBidFunds(eq(userId), eq(listingId), any())).thenReturn(wallet);
+        when(walletService.releaseBidFunds(eq(userId), eq(listingId), eq(amount), eq(idempotencyKey))).thenReturn(wallet);
 
-        HoldBalanceRequest request = new HoldBalanceRequest(new BigDecimal("30000"), listingId);
-        ResponseEntity<Wallet> response = walletController.releaseHold(authentication, request);
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(amount);
+        request.setListingId(listingId);
+        request.setIdempotencyKey(idempotencyKey);
+
+        ResponseEntity<WalletResponse> response = walletController.releaseHold(request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
     }
 
     // === settlePayment ===
 
     @Test
     void settlePayment_success() {
-        when(walletService.settlePayment(eq(userId), any(), any())).thenReturn(wallet);
+        BigDecimal amount = new BigDecimal("30000");
+        when(walletService.settlePayment(eq(userId), eq(amount), any(), eq(idempotencyKey))).thenReturn(wallet);
 
-        HoldBalanceRequest request = new HoldBalanceRequest(new BigDecimal("30000"), listingId);
-        ResponseEntity<Wallet> response = walletController.settlePayment(authentication, request);
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(amount);
+        request.setListingId(listingId);
+        request.setIdempotencyKey(idempotencyKey);
+
+        ResponseEntity<WalletResponse> response = walletController.settlePayment(request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
     }
 
     // === withdraw ===
 
     @Test
     void withdraw_success() {
+        BigDecimal amount = new BigDecimal("40000");
         wallet.setBalanceAvailable(new BigDecimal("60000"));
-        when(walletService.withdraw(eq(userId), any())).thenReturn(wallet);
 
-        ResponseEntity<Wallet> response = walletController.withdraw(
-                authentication, new WithdrawRequest(new BigDecimal("40000")));
+        Map<String, String> paymentDetails = new HashMap<>();
+        paymentDetails.put("bankName", "BCA");
+        paymentDetails.put("accountNumber", "1234567890");
+
+        WithdrawRequest request = new WithdrawRequest(
+                amount,
+                PaymentMethod.BANK,
+                paymentDetails,
+                idempotencyKey
+        );
+
+        when(walletService.withdraw(eq(userId), any(WithdrawRequest.class))).thenReturn(wallet);
+
+        ResponseEntity<WalletResponse> response = walletController.withdraw(
+                authentication, request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals(new BigDecimal("60000"), response.getBody().getBalanceAvailable());
     }
 
     @Test
     void withdraw_insufficientBalance_throwsException() {
-        when(walletService.withdraw(eq(userId), any()))
+        Map<String, String> paymentDetails = new HashMap<>();
+        paymentDetails.put("bankName", "BCA");
+        paymentDetails.put("accountNumber", "1234567890");
+
+        WithdrawRequest request = new WithdrawRequest(
+                new BigDecimal("999999"),
+                PaymentMethod.BANK,
+                paymentDetails,
+                idempotencyKey
+        );
+
+        when(walletService.withdraw(eq(userId), any(WithdrawRequest.class)))
                 .thenThrow(new InsufficientBalanceException("Saldo tidak mencukupi."));
 
         assertThrows(InsufficientBalanceException.class,
-                () -> walletController.withdraw(authentication, new WithdrawRequest(new BigDecimal("999999"))));
+                () -> walletController.withdraw(authentication, request));
     }
 
     // === getTransactionHistory ===
@@ -247,7 +338,7 @@ class WalletControllerTest {
         Transaction tx = new Transaction();
         when(walletService.getTransactionHistory(userId)).thenReturn(List.of(tx));
 
-        ResponseEntity<List<Transaction>> response = walletController.getTransactionHistory(authentication);
+        ResponseEntity<List<TransactionResponse>> response = walletController.getTransactionHistory(authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
@@ -261,10 +352,10 @@ class WalletControllerTest {
         Wallet sellerWallet = new Wallet(sellerId);
         sellerWallet.setBalanceAvailable(new BigDecimal("80000"));
 
-        when(walletService.confirmDelivery(eq(sellerId), any(), any())).thenReturn(sellerWallet);
+        when(walletService.confirmDelivery(eq(sellerId), any(), any(), eq(idempotencyKey))).thenReturn(sellerWallet);
 
-        ConfirmDeliveryRequest request = new ConfirmDeliveryRequest(sellerId, new BigDecimal("30000"), listingId);
-        ResponseEntity<Wallet> response = walletController.confirmDelivery(request);
+        ConfirmDeliveryRequest request = new ConfirmDeliveryRequest(sellerId, new BigDecimal("30000"), listingId, idempotencyKey);
+        ResponseEntity<WalletResponse> response = walletController.confirmDelivery(request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(new BigDecimal("80000"), response.getBody().getBalanceAvailable());
@@ -272,11 +363,11 @@ class WalletControllerTest {
 
     @Test
     void confirmDelivery_sellerNotFound_throwsException() {
-        when(walletService.confirmDelivery(any(), any(), any()))
+        when(walletService.confirmDelivery(any(), any(), any(), eq(idempotencyKey)))
                 .thenThrow(new WalletNotFoundException("Wallet seller tidak ditemukan."));
 
         ConfirmDeliveryRequest request = new ConfirmDeliveryRequest(
-                UUID.randomUUID(), new BigDecimal("30000"), listingId);
+                UUID.randomUUID(), new BigDecimal("30000"), listingId, idempotencyKey);
 
         assertThrows(WalletNotFoundException.class, () -> walletController.confirmDelivery(request));
     }

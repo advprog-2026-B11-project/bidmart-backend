@@ -1,5 +1,6 @@
 package com.example.bidmart.user.service;
 
+import com.example.bidmart.common.event.UserRegisteredEvent;
 import com.example.bidmart.user.dto.AuthResponse;
 import com.example.bidmart.user.dto.LoginRequest;
 import com.example.bidmart.user.dto.MfaVerificationRequest;
@@ -7,14 +8,15 @@ import com.example.bidmart.user.dto.RegisterRequest;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.Session;
 import com.example.bidmart.user.model.User;
+import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,19 +29,25 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final SessionService sessionService;
     private final MfaService mfaService;
+    private final RoleRepository roleRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthServiceImpl(UserRepository userRepository,
                             SessionRepository sessionRepository,
                             PasswordEncoder passwordEncoder,
                             JwtService jwtService,
                             SessionService sessionService,
-                            MfaService mfaService) {
+                            MfaService mfaService,
+                            RoleRepository roleRepository,
+                            ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.sessionService = sessionService;
         this.mfaService = mfaService;
+        this.roleRepository = roleRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -52,13 +60,19 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.getEmail());
         user.setDisplayName(request.getDisplayName());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(Role.USER);
+        Role defaultRole = roleRepository.findByName("USER")
+            .orElseThrow(() -> new IllegalStateException("Default role 'USER' tidak ditemukan di database."));
+        user.setRole(defaultRole);
         user.setEmailVerified(false);
 
         String verificationToken = UUID.randomUUID().toString();
         user.setVerificationToken(verificationToken);
 
         User savedUser = userRepository.save(user);
+
+        eventPublisher.publishEvent(
+                new UserRegisteredEvent(savedUser.getId(), savedUser.getUsername(), java.time.Instant.now())
+        );
 
         return mapToAuthResponse(savedUser, null, null);
     }
@@ -67,6 +81,10 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, String deviceInfo) {
         User user = findUserByIdentifier(request.getIdentifier());
+
+        if (!user.isActive()) {
+            throw new IllegalArgumentException("Account is deactivated.");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Invalid password.");
@@ -77,13 +95,21 @@ public class AuthServiceImpl implements AuthService {
             return AuthResponse.builder().mfaRequired(true).tempToken(tempToken).build();
         }
 
-        return finalizeLogin(user, "Default Device");
+        String resolvedDeviceInfo = (deviceInfo == null || deviceInfo.isBlank())
+                ? "Unknown-Device"
+                : deviceInfo;
+        return finalizeLogin(user, resolvedDeviceInfo);
     }
     @Override
     @Transactional
     public AuthResponse verifyMfaLogin(MfaVerificationRequest request){
         String username = jwtService.extractUsername(request.getTempToken());
         User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        if (!user.isActive()) {
+            throw new IllegalArgumentException("Account is deactivated.");
+        }
+
         if (!mfaService.verifyCode(user.getMfaSecret(), request.getCode())){
             throw new IllegalArgumentException("Invalid 2FA Code.");
         }
@@ -106,7 +132,7 @@ public class AuthServiceImpl implements AuthService {
             .username(user.getUsername())
             .email(user.getEmail())
             .displayName(user.getDisplayName())
-            .role(user.getRole().name())
+            .role(user.getRole().getName())
             .mfaRequired(false)
             .build();
     }
@@ -153,7 +179,7 @@ public class AuthServiceImpl implements AuthService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .displayName(user.getDisplayName())
-                .role(user.getRole().name())
+                .role(user.getRole().getName())
                 .build();
     }
 
