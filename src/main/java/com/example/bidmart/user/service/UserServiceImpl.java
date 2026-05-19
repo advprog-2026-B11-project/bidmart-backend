@@ -12,10 +12,12 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
 
-import java.util.UUID;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,32 +28,50 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
     private static final String MFA_METHOD_NONE = "NONE";
+    private static final int EMAIL_MFA_CODE_LENGTH = 6;
+    private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
+    private static final long DEFAULT_EMAIL_MFA_TTL_SECONDS = 300L;
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     private final UserRepository userRepository;
     private final SessionRepository sessionRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final MfaService mfaService;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+    private final long emailMfaCodeTtlSeconds;
 
     @Autowired
     public UserServiceImpl(UserRepository userRepository,
                            SessionRepository sessionRepository,
                            ApplicationEventPublisher eventPublisher,
                            MfaService mfaService,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           EmailService emailService,
+                           @Value("${app.mfa.email-code-ttl-seconds:300}") long emailMfaCodeTtlSeconds) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.eventPublisher = eventPublisher;
         this.mfaService = mfaService;
         this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
+        this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
     }
 
     @Deprecated
     public UserServiceImpl(UserRepository userRepository,
                            SessionRepository sessionRepository,
                            ApplicationEventPublisher eventPublisher,
-                           MfaService mfaService) {
-        this(userRepository, sessionRepository, eventPublisher, mfaService, new BCryptPasswordEncoder());
+                           MfaService mfaService,
+                           EmailService emailService) {
+        this(userRepository,
+                sessionRepository,
+                eventPublisher,
+                mfaService,
+                new BCryptPasswordEncoder(),
+                emailService,
+                DEFAULT_EMAIL_MFA_TTL_SECONDS);
     }
 
     @Override
@@ -131,8 +151,23 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public MfaStatusResponse enableEmailMfa(String username) {
         User user = findByUsername(username);
+        if (user.isMfaEnabled()) {
+            throw new IllegalArgumentException("MFA already enabled. Disable first to switch method.");
+        }
+
+        user.setMfaMethod(MfaMethod.EMAIL);
+        issueEmailMfaCode(user);
+        return mapToMfaStatus(user);
+    }
+
+    @Override
+    @Transactional
+    public MfaStatusResponse verifyEmailMfa(String username, String code) {
+        User user = findByUsername(username);
+        verifyEmailMfaCode(user, code);
         user.setMfaEnabled(true);
         user.setMfaMethod(MfaMethod.EMAIL);
+        clearEmailMfaCode(user);
         userRepository.save(user);
         return mapToMfaStatus(user);
     }
@@ -244,6 +279,38 @@ public class UserServiceImpl implements UserService {
         }
 
         throw new IllegalArgumentException("Invalid password or 2FA Code.");
+    }
+
+    private void issueEmailMfaCode(User user) {
+        String code = generateEmailMfaCode();
+        user.setMfaEmailCode(code);
+        user.setMfaEmailCodeExpiresAt(Instant.now().plusSeconds(emailMfaCodeTtlSeconds));
+        userRepository.save(user);
+        emailService.sendMfaCodeEmail(user.getEmail(), code);
+    }
+
+    private void verifyEmailMfaCode(User user, String code) {
+        if (user.getMfaEmailCode() == null || user.getMfaEmailCodeExpiresAt() == null) {
+            throw new IllegalArgumentException("2FA code expired or not requested.");
+        }
+        if (user.getMfaEmailCodeExpiresAt().isBefore(Instant.now())) {
+            clearEmailMfaCode(user);
+            userRepository.save(user);
+            throw new IllegalArgumentException("2FA code expired or not requested.");
+        }
+        if (!user.getMfaEmailCode().equals(code)) {
+            throw new IllegalArgumentException("Invalid 2FA Code.");
+        }
+    }
+
+    private void clearEmailMfaCode(User user) {
+        user.setMfaEmailCode(null);
+        user.setMfaEmailCodeExpiresAt(null);
+    }
+
+    private String generateEmailMfaCode() {
+        int value = secureRandom.nextInt(EMAIL_MFA_CODE_MAX);
+        return String.format("%0" + EMAIL_MFA_CODE_LENGTH + "d", value);
     }
 
     @Override

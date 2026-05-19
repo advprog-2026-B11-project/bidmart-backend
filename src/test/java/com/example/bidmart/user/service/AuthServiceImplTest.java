@@ -113,6 +113,36 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void register_shouldUseRequestedRoleWhenProvided() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("selleruser");
+        request.setEmail("seller@mail.com");
+        request.setPassword("password123");
+        request.setDisplayName("Seller User");
+        request.setRole("seller");
+
+        Role sellerRole = new Role(UUID.randomUUID(), "SELLER", new HashSet<>());
+
+        when(userRepository.existsByUsername(request.getUsername())).thenReturn(false);
+        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
+        when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded-password");
+        when(roleRepository.findByName("SELLER")).thenReturn(Optional.of(sellerRole));
+
+        User savedUser = new User();
+        savedUser.setUsername(request.getUsername());
+        savedUser.setEmail(request.getEmail());
+        savedUser.setRole(sellerRole);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+        AuthResponse response = authService.register(request);
+
+        assertNotNull(response);
+        assertEquals("SELLER", response.getRole());
+        verify(roleRepository, times(1)).findByName("SELLER");
+        verify(emailService, times(1)).sendVerificationEmail(eq("seller@mail.com"), anyString());
+    }
+
+    @Test
     void resendVerification_shouldRotateTokenAndSendEmail() {
         mockUser.setEmailVerified(false);
         mockUser.setVerificationToken("old-token");

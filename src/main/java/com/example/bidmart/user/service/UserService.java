@@ -16,6 +16,7 @@ public interface UserService {
     MfaSetupResponse setupMfa(String username);
     MfaStatusResponse enableMfa(String username, String code);
     MfaStatusResponse enableEmailMfa(String username);
+    MfaStatusResponse verifyEmailMfa(String username, String code);
     MfaStatusResponse disableMfa(String username, String password, String totpCode);
     void deactivateUser(UUID userId);
     void changeUserRole(UUID userId, Role newRole);

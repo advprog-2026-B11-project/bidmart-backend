@@ -25,3 +25,4 @@ PRINSIP YANG WAJIB DIIKUTI:
 - Semua event cross-module HARUS di package com.example.bidmart.common.event
 - SOLID principles: terutama SRP dan OCP
 - Clean code: method kecil, nama deskriptif, tidak ada magic string
+- LAKUKAN TEST SETELAH KAMU MERUBAH SESUATU UNTUK MEMASTIKAN FITUR BERFUNGSI DENGAN BAIK

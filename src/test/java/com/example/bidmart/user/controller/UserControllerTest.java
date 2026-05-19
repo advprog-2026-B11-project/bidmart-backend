@@ -1,6 +1,7 @@
 package com.example.bidmart.user.controller;
 
 import com.example.bidmart.user.dto.MfaDisableRequest;
+import com.example.bidmart.user.dto.MfaEmailVerifyRequest;
 import com.example.bidmart.user.dto.MfaEnableRequest;
 import com.example.bidmart.user.dto.MfaSetupResponse;
 import com.example.bidmart.user.dto.MfaStatusResponse;
@@ -139,7 +140,7 @@ class UserControllerTest {
 
     @Test
     void enableEmailMfa_shouldReturnStatus() {
-        MfaStatusResponse statusResponse = new MfaStatusResponse(true, "EMAIL");
+        MfaStatusResponse statusResponse = new MfaStatusResponse(false, "EMAIL");
         when(userService.enableEmailMfa("alice")).thenReturn(statusResponse);
 
         ResponseEntity<MfaStatusResponse> response = userController.enableEmailMfa(authentication);
@@ -147,6 +148,21 @@ class UserControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("EMAIL", response.getBody().getMethod());
         verify(userService, times(1)).enableEmailMfa("alice");
+    }
+
+    @Test
+    void verifyEmailMfa_shouldReturnStatus() {
+        MfaEmailVerifyRequest request = new MfaEmailVerifyRequest();
+        request.setCode("654321");
+        MfaStatusResponse statusResponse = new MfaStatusResponse(true, "EMAIL");
+        when(userService.verifyEmailMfa("alice", "654321")).thenReturn(statusResponse);
+
+        ResponseEntity<MfaStatusResponse> response = userController.verifyEmailMfa(authentication, request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody().isEnabled());
+        assertEquals("EMAIL", response.getBody().getMethod());
+        verify(userService, times(1)).verifyEmailMfa("alice", "654321");
     }
 
     @Test

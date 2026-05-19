@@ -20,12 +20,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +39,7 @@ class UserServiceImplTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private MfaService mfaService;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private EmailService emailService;
 
     private UserServiceImpl userService;
     private User user;
@@ -57,10 +61,17 @@ class UserServiceImplTest {
         user.setEmailVerified(false);
         user.setActive(true);
 
-        userService = new UserServiceImpl(userRepository, sessionRepository, eventPublisher, mfaService, passwordEncoder);
+        userService = new UserServiceImpl(
+            userRepository,
+            sessionRepository,
+            eventPublisher,
+            mfaService,
+            passwordEncoder,
+            emailService,
+            300L
+        );
     }
 
-    // --- EXISTING TESTS ---
     @Test
     void updateProfile_shouldUpdateOnlyProvidedFields() {
         UpdateProfileRequest request = new UpdateProfileRequest();
@@ -96,8 +107,6 @@ class UserServiceImplTest {
         assertEquals(user.getId(), idCaptor.getValue());
         verify(userRepository, times(1)).delete(user);
     }
-
-    // --- NEW TESTS UNTUK MENAMBAH COVERAGE ---
 
     @Test
     void getCurrentUser_shouldReturnMappedProfile() {
@@ -156,13 +165,32 @@ class UserServiceImplTest {
     @Test
     void enableEmailMfa_shouldSetEmailMethod() {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
 
         MfaStatusResponse response = userService.enableEmailMfa("alice");
 
+        assertFalse(response.isEnabled());
+        assertEquals("EMAIL", response.getMethod());
+        assertEquals(MfaMethod.EMAIL, user.getMfaMethod());
+        assertNotNull(user.getMfaEmailCode());
+        assertNotNull(user.getMfaEmailCodeExpiresAt());
+        verify(userRepository, times(1)).save(user);
+        verify(emailService, times(1)).sendMfaCodeEmail(eq("alice@mail.com"), anyString());
+    }
+
+    @Test
+    void verifyEmailMfa_shouldEnableWhenCodeValid() {
+        user.setMfaEmailCode("654321");
+        user.setMfaEmailCodeExpiresAt(Instant.now().plusSeconds(300));
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        MfaStatusResponse response = userService.verifyEmailMfa("alice", "654321");
+
         assertTrue(response.isEnabled());
         assertEquals("EMAIL", response.getMethod());
-        assertTrue(user.isMfaEnabled());
-        assertEquals(MfaMethod.EMAIL, user.getMfaMethod());
+        assertNull(user.getMfaEmailCode());
+        assertNull(user.getMfaEmailCodeExpiresAt());
         verify(userRepository, times(1)).save(user);
     }
 

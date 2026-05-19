@@ -1,6 +1,7 @@
 package com.example.bidmart.user.controller;
 
 import com.example.bidmart.user.dto.MfaDisableRequest;
+import com.example.bidmart.user.dto.MfaEmailVerifyRequest;
 import com.example.bidmart.user.dto.MfaEnableRequest;
 import com.example.bidmart.user.dto.MfaSetupResponse;
 import com.example.bidmart.user.dto.MfaStatusResponse;
@@ -75,6 +76,15 @@ public class UserController {
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE_EMAIL)")
     public ResponseEntity<MfaStatusResponse> enableEmailMfa(Authentication authentication) {
         MfaStatusResponse status = userService.enableEmailMfa(authentication.getName());
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping("/me/mfa/email/verify")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE_EMAIL)")
+    public ResponseEntity<MfaStatusResponse> verifyEmailMfa(
+            Authentication authentication,
+            @Valid @RequestBody MfaEmailVerifyRequest request) {
+        MfaStatusResponse status = userService.verifyEmailMfa(authentication.getName(), request.getCode());
         return ResponseEntity.ok(status);
     }
 

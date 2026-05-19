@@ -20,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -30,6 +32,8 @@ public class AuthServiceImpl implements AuthService {
     private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
     private static final long DEFAULT_EMAIL_MFA_TTL_SECONDS = 300L;
     private static final int DEFAULT_MAX_CONCURRENT_SESSIONS = 3;
+    private static final String DEFAULT_ROLE_NAME = "USER";
+    private static final Set<String> REGISTRABLE_ROLE_NAMES = Set.of("USER", "SELLER");
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -103,9 +107,10 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.getEmail());
         user.setDisplayName(request.getDisplayName());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        Role defaultRole = roleRepository.findByName("USER")
-            .orElseThrow(() -> new IllegalStateException("Default role 'USER' tidak ditemukan di database."));
-        user.setRole(defaultRole);
+        String roleName = resolveRoleName(request.getRole());
+        Role selectedRole = roleRepository.findByName(roleName)
+            .orElseThrow(() -> new IllegalStateException("Role '" + roleName + "' tidak ditemukan di database."));
+        user.setRole(selectedRole);
         user.setEmailVerified(false);
 
         String verificationToken = UUID.randomUUID().toString();
@@ -221,6 +226,16 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email is already registered.");
         }
+    }
+
+    private String resolveRoleName(String requestedRole) {
+        String roleName = (requestedRole == null || requestedRole.isBlank())
+                ? DEFAULT_ROLE_NAME
+                : requestedRole.trim().toUpperCase(Locale.ROOT);
+        if (!REGISTRABLE_ROLE_NAMES.contains(roleName)) {
+            throw new IllegalArgumentException("Role tidak valid. Pilih USER atau SELLER.");
+        }
+        return roleName;
     }
 
     private User findUserByIdentifier(String identifier) {
