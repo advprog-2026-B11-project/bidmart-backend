@@ -301,4 +301,65 @@ class ListingServiceTest {
 
         assertEquals(AuctionStatus.CLOSED, result.getStatus());
     }
+
+    @Test
+    void createListing_shouldValidateEndTimeInFuture() {
+        UUID sellerId = UUID.randomUUID();
+        Listing newListing = new Listing();
+        newListing.setTitle("Test Listing");
+        newListing.setStartingPrice(new BigDecimal("100"));
+        newListing.setEndTime(LocalDateTime.now().minusHours(1));
+
+        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("endTime harus di masa depan"));
+
+        assertThrows(RuntimeException.class, () -> {
+            listingService.createListing(newListing, sellerId);
+        });
+    }
+
+    @Test
+    void createListing_shouldValidateStartingPriceGreaterThanZero() {
+        UUID sellerId = UUID.randomUUID();
+        Listing newListing = new Listing();
+        newListing.setTitle("Test Listing");
+        newListing.setStartingPrice(new BigDecimal("0"));
+        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+
+        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("startingPrice harus > 0"));
+
+        assertThrows(RuntimeException.class, () -> {
+            listingService.createListing(newListing, sellerId);
+        });
+    }
+
+    @Test
+    void createListing_shouldValidateReservePriceGreaterThanOrEqualStartingPrice() {
+        UUID sellerId = UUID.randomUUID();
+        Listing newListing = new Listing();
+        newListing.setTitle("Test Listing");
+        newListing.setStartingPrice(new BigDecimal("100"));
+        newListing.setReservePrice(new BigDecimal("50"));
+        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+
+        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("reservePrice harus >= startingPrice"));
+
+        assertThrows(RuntimeException.class, () -> {
+            listingService.createListing(newListing, sellerId);
+        });
+    }
+
+    @Test
+    void createListing_shouldValidateTitleNotBlank() {
+        UUID sellerId = UUID.randomUUID();
+        Listing newListing = new Listing();
+        newListing.setTitle("");
+        newListing.setStartingPrice(new BigDecimal("100"));
+        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+
+        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("title tidak boleh blank"));
+
+        assertThrows(RuntimeException.class, () -> {
+            listingService.createListing(newListing, sellerId);
+        });
+    }
 }

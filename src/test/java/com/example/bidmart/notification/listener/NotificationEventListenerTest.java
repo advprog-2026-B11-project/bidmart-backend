@@ -109,4 +109,72 @@ class NotificationEventListenerTest {
 
         verify(notificationService, times(1)).createNotification(eq(sellerId), eq("AUCTION_EXTENDED"), anyString());
     }
+
+    @Test
+    void handleBalanceTopUp_success() {
+        UUID userId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(50000);
+
+        BalanceTopUpEvent event = new BalanceTopUpEvent(userId, amount, "BANK");
+        notificationEventListener.handleBalanceTopUp(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_TOPUP"), anyString());
+    }
+
+    @Test
+    void handleBalanceHeld_success() {
+        UUID userId = UUID.randomUUID();
+        UUID listingId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(30000);
+
+        BalanceHeldEvent event = new BalanceHeldEvent(userId, amount, listingId);
+        notificationEventListener.handleBalanceHeld(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_HELD"), anyString());
+    }
+
+    @Test
+    void handleBalanceReleased_success() {
+        UUID userId = UUID.randomUUID();
+        UUID listingId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(30000);
+
+        BalanceReleasedEvent event = new BalanceReleasedEvent(userId, amount, listingId);
+        notificationEventListener.handleBalanceReleased(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_RELEASED"), anyString());
+    }
+
+    @Test
+    void handleWithdraw_success() {
+        UUID userId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(25000);
+
+        WithdrawEvent event = new WithdrawEvent(userId, amount, "BCA");
+        notificationEventListener.handleWithdraw(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_WITHDRAW"), anyString());
+    }
+
+    @Test
+    void handleBalanceSettled_success() {
+        UUID userId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(100000);
+
+        BalanceSettledEvent event = new BalanceSettledEvent(userId, amount, "REF-001");
+        notificationEventListener.handleBalanceSettled(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_SETTLED"), anyString());
+    }
+
+    @Test
+    void handleBalanceIncome_success() {
+        UUID userId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(80000);
+
+        BalanceIncomeEvent event = new BalanceIncomeEvent(userId, amount, "REF-002");
+        notificationEventListener.handleBalanceIncome(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_INCOME"), anyString());
+    }
 }
