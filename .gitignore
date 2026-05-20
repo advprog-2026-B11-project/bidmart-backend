@@ -41,3 +41,5 @@ out/
 application-local.properties
 .env
 Rulebook.md
+docker-compose.yml
+src\main\resources\application-local.properties
