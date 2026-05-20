@@ -212,9 +212,12 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Email already verified.");
         }
 
-        String verificationToken = UUID.randomUUID().toString();
-        user.setVerificationToken(verificationToken);
-        userRepository.save(user);
+        String verificationToken = user.getVerificationToken();
+        if (verificationToken == null || verificationToken.isBlank()) {
+            verificationToken = UUID.randomUUID().toString();
+            user.setVerificationToken(verificationToken);
+            userRepository.save(user);
+        }
 
         sendVerificationEmail(user, verificationToken);
     }

@@ -265,17 +265,18 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Password or TOTP code is required.");
         }
 
-        if (hasPassword && passwordEncoder.matches(password, user.getPassword())) {
-            return;
-        }
-
         if (hasTotpCode) {
             if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
                 throw new IllegalArgumentException("TOTP is not configured.");
             }
-            if (mfaService.verifyCode(user.getMfaSecret(), totpCode)) {
-                return;
+            if (!mfaService.verifyCode(user.getMfaSecret(), totpCode)) {
+                throw new IllegalArgumentException("Invalid 2FA Code.");
             }
+            return;
+        }
+
+        if (hasPassword && passwordEncoder.matches(password, user.getPassword())) {
+            return;
         }
 
         throw new IllegalArgumentException("Invalid password or 2FA Code.");

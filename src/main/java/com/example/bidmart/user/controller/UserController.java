@@ -73,14 +73,14 @@ public class UserController {
     }
 
     @PostMapping("/me/mfa/email/enable")
-    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE_EMAIL)")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE)")
     public ResponseEntity<MfaStatusResponse> enableEmailMfa(Authentication authentication) {
         MfaStatusResponse status = userService.enableEmailMfa(authentication.getName());
         return ResponseEntity.ok(status);
     }
 
     @PostMapping("/me/mfa/email/verify")
-    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE_EMAIL)")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).USER_MFA_ENABLE)")
     public ResponseEntity<MfaStatusResponse> verifyEmailMfa(
             Authentication authentication,
             @Valid @RequestBody MfaEmailVerifyRequest request) {
