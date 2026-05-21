@@ -50,6 +50,18 @@ public class ListingService {
         }
     }
 
+    private void validatePriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
+        if (minPrice != null && minPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Minimum price tidak boleh negatif.");
+        }
+        if (maxPrice != null && maxPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Maximum price tidak boleh negatif.");
+        }
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new IllegalArgumentException("Minimum price tidak boleh lebih besar dari maximum price.");
+        }
+    }
+
     public List<Listing> getAllListings() {
         return listingRepository.findAll();
     }
@@ -110,16 +122,18 @@ public class ListingService {
     }
 
     public List<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice) {
-        UUID categoryId = null;
-        if (category != null && !category.isEmpty()) {
-            try {
-                categoryId = UUID.fromString(category);
-            } catch (IllegalArgumentException e) {
-                // Invalid UUID, ignore category filter
-            }
+    validatePriceRange(minPrice, maxPrice);
+
+    UUID categoryId = null;
+    if (category != null && !category.isEmpty()) {
+        try {
+            categoryId = UUID.fromString(category);
+        } catch (IllegalArgumentException e) {
+            categoryId = null;
         }
-        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
     }
+    return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
+}
 
     public List<Listing> getActiveListings() {
         return listingRepository.findActiveListings();
