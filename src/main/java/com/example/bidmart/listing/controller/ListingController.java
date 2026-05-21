@@ -38,7 +38,7 @@ public class ListingController {
     ) {
         UUID sellerId = resolveCurrentUserId(authentication);
         Listing created = listingService.createListing(request, sellerId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.ok(created);
     }
     
     @GetMapping

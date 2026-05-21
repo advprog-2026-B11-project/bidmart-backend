@@ -158,7 +158,7 @@ class ListingControllerTest {
         ResponseEntity<Listing> response =
                 listingController.createListing(request, authentication);
 
-        assertEquals(201, response.getStatusCode().value());
+        assertEquals(200, response.getStatusCode().value());
         assertEquals(listingId, response.getBody().getId());
     }
 
