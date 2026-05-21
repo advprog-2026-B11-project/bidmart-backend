@@ -4,6 +4,7 @@ import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.notification.model.Notification;
 import com.example.bidmart.notification.model.NotificationPreference;
 import com.example.bidmart.notification.service.NotificationService;
+import com.example.bidmart.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -34,6 +36,9 @@ class NotificationControllerFunctionalTest {
 
     @Mock
     private NotificationService notificationService;
+
+    @Mock
+    private UserService userService;
 
     @InjectMocks
     private NotificationController notificationController;
@@ -69,16 +74,21 @@ class NotificationControllerFunctionalTest {
                 .build();
     }
 
-    private Principal mockPrincipal(UUID userId) {
-        return () -> userId.toString();
+    private Principal mockPrincipal() {
+        return new UsernamePasswordAuthenticationToken("testuser", null);
+    }
+
+    private void mockCurrentUser() {
+        when(userService.getUserIdByUsername("testuser")).thenReturn(userId);
     }
 
     @Test
     void testGetUserNotifications_ShouldReturnList() throws Exception {
+        mockCurrentUser();
         when(notificationService.getUserNotifications(userId)).thenReturn(List.of(notification));
 
         mockMvc.perform(get("/api/notifications/user/{userId}", userId)
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(notificationId.toString()))
@@ -87,10 +97,11 @@ class NotificationControllerFunctionalTest {
 
     @Test
     void testGetUnreadNotifications_ShouldReturnList() throws Exception {
+        mockCurrentUser();
         when(notificationService.getUnreadNotifications(userId)).thenReturn(List.of(notification));
 
         mockMvc.perform(get("/api/notifications/user/{userId}/unread", userId)
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].read").value(false));
@@ -102,7 +113,7 @@ class NotificationControllerFunctionalTest {
         when(notificationService.markAsRead(notificationId)).thenReturn(notification);
 
         mockMvc.perform(patch("/api/notifications/{notificationId}/read", notificationId)
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.read").value(true));
@@ -110,10 +121,11 @@ class NotificationControllerFunctionalTest {
 
     @Test
     void testMarkAllAsRead_ShouldReturnSuccessMessage() throws Exception {
+        mockCurrentUser();
         doNothing().when(notificationService).markAllAsRead(userId);
 
         mockMvc.perform(patch("/api/notifications/user/{userId}/read-all", userId)
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Semua notifikasi berhasil ditandai sudah dibaca"));
@@ -124,7 +136,7 @@ class NotificationControllerFunctionalTest {
         doNothing().when(notificationService).deleteNotification(notificationId);
 
         mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Notifikasi berhasil dihapus"));
@@ -132,10 +144,11 @@ class NotificationControllerFunctionalTest {
 
     @Test
     void testGetPreferences_ShouldReturnPreferences() throws Exception {
+        mockCurrentUser();
         when(notificationService.getPreference(userId)).thenReturn(preference);
 
         mockMvc.perform(get("/api/notifications/user/{userId}/preferences", userId)
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.emailEnabled").value(true));
@@ -143,6 +156,7 @@ class NotificationControllerFunctionalTest {
 
     @Test
     void testUpdatePreferences_ShouldReturnUpdatedPreferences() throws Exception {
+        mockCurrentUser();
         preference.setEmailEnabled(false);
         preference.setMutedTypes(new HashSet<>(List.of("PROMO")));
 
@@ -152,7 +166,7 @@ class NotificationControllerFunctionalTest {
         String jsonRequest = "{\"emailEnabled\": false, \"pushEnabled\": true, \"inAppEnabled\": true, \"mutedTypes\": [\"PROMO\"]}";
 
         mockMvc.perform(put("/api/notifications/user/{userId}/preferences", userId)
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonRequest))
                 .andExpect(status().isOk())
@@ -178,7 +192,7 @@ class NotificationControllerFunctionalTest {
                 .thenThrow(new ResourceNotFoundException("Notifikasi tidak ditemukan"));
 
         mockMvc.perform(patch("/api/notifications/{notificationId}/read", UUID.randomUUID())
-                .principal(mockPrincipal(userId))
+                .principal(mockPrincipal())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
     }
