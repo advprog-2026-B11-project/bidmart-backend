@@ -1,6 +1,7 @@
 package com.example.bidmart.user.service;
 
 import com.example.bidmart.user.model.Session;
+import com.example.bidmart.user.model.SessionOverflowPolicy;
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
@@ -19,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -39,7 +39,7 @@ class SessionServiceTest {
 
     @BeforeEach
     void setUp() {
-        sessionService = new SessionServiceImpl(sessionRepository, userRepository);
+        sessionService = new SessionServiceImpl(sessionRepository, userRepository, SessionOverflowPolicy.REVOKE_OLDEST);
         user = new User();
         user.setId(UUID.randomUUID());
         user.setUsername("alice");
