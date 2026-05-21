@@ -4,6 +4,7 @@ import com.example.bidmart.order.dto.*;
 import com.example.bidmart.order.model.Order;
 import com.example.bidmart.order.model.OrderStatus;
 import com.example.bidmart.order.service.OrderService;
+import com.example.bidmart.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,9 @@ class OrderControllerTest {
     private OrderService orderService;
 
     @Mock
+    private UserService userService;
+
+    @Mock
     private Authentication authentication;
 
     @InjectMocks
@@ -49,8 +53,10 @@ class OrderControllerTest {
 
     @Test
     void getOrdersByBuyer_returnsOk() {
+        when(authentication.getName()).thenReturn("buyeruser");
+        when(userService.getUserIdByUsername("buyeruser")).thenReturn(buyerId);
         when(orderService.getOrdersByBuyer(buyerId)).thenReturn(Arrays.asList(order));
-        ResponseEntity<List<Order>> response = orderController.getOrdersByBuyer(buyerId);
+        ResponseEntity<List<Order>> response = orderController.getOrdersByBuyer(buyerId, authentication);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
     }
@@ -58,6 +64,7 @@ class OrderControllerTest {
     @Test
     void updateTrackingNumber_returnsOk() {
         when(authentication.getName()).thenReturn(sellerId.toString());
+        when(userService.getUserIdByUsername(sellerId.toString())).thenReturn(sellerId);
         when(orderService.updateTrackingNumber(eq(orderId), eq(sellerId), eq("RESI123"))).thenReturn(order);
         
         UpdateTrackingRequest request = new UpdateTrackingRequest();
@@ -70,6 +77,7 @@ class OrderControllerTest {
     @Test
     void confirmDelivery_returnsOk() {
         when(authentication.getName()).thenReturn(buyerId.toString());
+        when(userService.getUserIdByUsername(buyerId.toString())).thenReturn(buyerId);
         when(orderService.confirmDelivery(orderId, buyerId)).thenReturn(order);
 
         ResponseEntity<Order> response = orderController.confirmDelivery(orderId, authentication);
@@ -79,6 +87,7 @@ class OrderControllerTest {
     @Test
     void disputeOrder_returnsOk() {
         when(authentication.getName()).thenReturn(buyerId.toString());
+        when(userService.getUserIdByUsername(buyerId.toString())).thenReturn(buyerId);
         when(orderService.disputeOrder(eq(orderId), eq(buyerId), eq("Rusak"))).thenReturn(order);
 
         DisputeRequest request = new DisputeRequest();
