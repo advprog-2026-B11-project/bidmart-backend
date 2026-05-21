@@ -73,12 +73,10 @@ class ListingServiceTest {
 
     @Test
     void deleteListing_shouldFail_whenAuctionActive() {
-        when(listingRepository.findById(listingId))
-                .thenReturn(Optional.of(listing));
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId, ownerId, false);
-        });
+        assertThrows(IllegalArgumentException.class,
+                () -> listingService.deleteListing(listingId, ownerId, false));
     }
 
     @Test
@@ -108,9 +106,8 @@ class ListingServiceTest {
         listing.setStatus(AuctionStatus.EXTENDED);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId, ownerId, false);
-        });
+        assertThrows(IllegalArgumentException.class,
+                () -> listingService.deleteListing(listingId, ownerId, false));
     }
 
     @Test
