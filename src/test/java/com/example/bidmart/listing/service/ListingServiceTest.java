@@ -1,6 +1,7 @@
 package com.example.bidmart.listing.service;
 
 import com.example.bidmart.listing.dto.CreateListingRequest;
+import com.example.bidmart.listing.dto.UpdateListingRequest;
 import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
@@ -48,29 +49,22 @@ class ListingServiceTest {
 
     @Test
     void updateListing_shouldFail_whenAuctionActive() {
-        when(listingRepository.findById(listingId))
-                .thenReturn(Optional.of(listing));
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
-        Listing updated = new Listing();
+        UpdateListingRequest request = updateRequest();
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.updateListing(listingId, updated);
-        });
+        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, request));
     }
 
     @Test
     void updateListing_shouldSuccess_whenAuctionNotActive() {
         listing.setStatus(AuctionStatus.CLOSED);
 
-        when(listingRepository.findById(listingId))
-                .thenReturn(Optional.of(listing));
-        when(listingRepository.save(listing))
-                .thenReturn(listing);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(listing)).thenReturn(listing);
 
-        Listing updated = new Listing();
-        updated.setTitle("Updated");
-
-        Listing result = listingService.updateListing(listingId, updated);
+        UpdateListingRequest request = updateRequest();
+        Listing result = listingService.updateListing(listingId, request);
 
         assertEquals("Updated", result.getTitle());
     }
@@ -101,11 +95,10 @@ class ListingServiceTest {
     void updateListing_shouldFail_whenAuctionExtended() {
         listing.setStatus(AuctionStatus.EXTENDED);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        Listing updated = new Listing();
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.updateListing(listingId, updated);
-        });
+        UpdateListingRequest request = updateRequest();
+
+        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, request));
     }
 
     @Test
@@ -121,11 +114,10 @@ class ListingServiceTest {
     @Test
     void updateListing_shouldFail_whenListingNotFound() {
         when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
-        Listing updated = new Listing();
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.updateListing(listingId, updated);
-        });
+        UpdateListingRequest request = updateRequest();
+
+        assertThrows(RuntimeException.class, () -> listingService.updateListing(listingId, request));
     }
 
     @Test
@@ -193,50 +185,41 @@ class ListingServiceTest {
     void updateListing_shouldUpdateAllEditableFields() {
         listing.setStatus(AuctionStatus.CLOSED);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        when(listingRepository.save(any(Listing.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Listing updated = new Listing();
-        updated.setTitle("Updated Title");
-        updated.setDescription("Updated Description");
-        updated.setImageUrl("updated.jpg");
-        updated.setStartingPrice(new BigDecimal("500"));
-        updated.setReservePrice(new BigDecimal("700"));
-        updated.setEndTime(LocalDateTime.now().plusDays(1));
+        UpdateListingRequest request = updateRequest();
+        Listing result = listingService.updateListing(listingId, request);
 
-        Listing result = listingService.updateListing(listingId, updated);
-        assertEquals("Updated Title", result.getTitle());
-        assertEquals("Updated Description", result.getDescription());
-        assertEquals("updated.jpg", result.getImageUrl());
+        assertEquals("Updated", result.getTitle());
+        assertEquals("Description", result.getDescription());
+        assertEquals("image.jpg", result.getImageUrl());
         assertEquals(new BigDecimal("500"), result.getStartingPrice());
         assertEquals(new BigDecimal("700"), result.getReservePrice());
+        assertEquals(AuctionType.ENGLISH, result.getAuctionType());
     }
 
     @Test
-    void updateListing_shouldAllowNullStatus() {
+    void updateListing_shouldKeepExistingStatus() {
         listing.setStatus(AuctionStatus.CLOSED);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        when(listingRepository.save(any(Listing.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        Listing updated = new Listing();
-        updated.setTitle("No Status Change");
-        Listing result = listingService.updateListing(listingId, updated);
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertEquals("No Status Change", result.getTitle());
+        Listing result = listingService.updateListing(listingId, updateRequest());
+
         assertEquals(AuctionStatus.CLOSED, result.getStatus());
     }
 
     @Test
-    void updateListing_shouldAllowNullAuctionStatus() {
-        listing.setStatus(null);
+    void updateListing_shouldDefaultAuctionTypeToEnglishWhenRequestAuctionTypeNull() {
+        listing.setStatus(AuctionStatus.CLOSED);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        when(listingRepository.save(any(Listing.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        Listing updated = new Listing();
-        updated.setTitle("Null Status Update");
-        Listing result = listingService.updateListing(listingId, updated);
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertEquals("Null Status Update", result.getTitle());
+        UpdateListingRequest request = new UpdateListingRequest(UUID.randomUUID(), "Updated", "Description", "image.jpg",
+                new BigDecimal("500"), new BigDecimal("700"), LocalDateTime.now().plusDays(1), null);
+        Listing result = listingService.updateListing(listingId, request);
+
+        assertEquals(AuctionType.ENGLISH, result.getAuctionType());
     }
 
     @Test
@@ -356,5 +339,10 @@ class ListingServiceTest {
                                                BigDecimal reservePrice, LocalDateTime endTime, AuctionType auctionType) {
         return new CreateListingRequest(categoryId, title, "Description", "image.jpg",
                 startingPrice, reservePrice, endTime, auctionType);
+    }
+
+    private UpdateListingRequest updateRequest() {
+        return new UpdateListingRequest(UUID.randomUUID(), "Updated", "Description", "image.jpg",
+                new BigDecimal("500"), new BigDecimal("700"), LocalDateTime.now().plusDays(1), AuctionType.ENGLISH);
     }
 }

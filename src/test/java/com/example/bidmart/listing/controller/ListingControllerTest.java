@@ -1,6 +1,7 @@
 package com.example.bidmart.listing.controller;
 
 import com.example.bidmart.listing.dto.CreateListingRequest;
+import com.example.bidmart.listing.dto.UpdateListingRequest;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
@@ -52,10 +53,11 @@ class ListingControllerTest {
 
     @Test
     void updateListing_success() {
-        when(listingService.updateListing(listingId, listing))
-                .thenReturn(listing);
+        UpdateListingRequest request = updateRequest();
 
-        ResponseEntity<?> response = listingController.updateListing(listingId, listing);
+        when(listingService.updateListing(listingId, request)).thenReturn(listing);
+
+        ResponseEntity<?> response = listingController.updateListing(listingId, request);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
@@ -63,10 +65,12 @@ class ListingControllerTest {
 
     @Test
     void updateListing_fail_whenAuctionActive() {
-        when(listingService.updateListing(listingId, listing))
-                .thenThrow(new RuntimeException("Listing tidak bisa diupdate saat auction masih aktif."));
+        UpdateListingRequest request = updateRequest();
 
-        ResponseEntity<?> response = listingController.updateListing(listingId, listing);
+        when(listingService.updateListing(listingId, request))
+                .thenThrow(new IllegalArgumentException("Listing tidak bisa diupdate saat auction masih aktif."));
+
+        ResponseEntity<?> response = listingController.updateListing(listingId, request);
 
         assertEquals(400, response.getStatusCode().value());
         assertEquals("Listing tidak bisa diupdate saat auction masih aktif.", response.getBody());
@@ -199,6 +203,11 @@ class ListingControllerTest {
 
     private CreateListingRequest createRequest() {
         return new CreateListingRequest(UUID.randomUUID(), "Test", "Description", "image.jpg",
+                new BigDecimal("100"), new BigDecimal("150"), LocalDateTime.now().plusHours(1), null);
+    }
+
+    private UpdateListingRequest updateRequest() {
+        return new UpdateListingRequest(UUID.randomUUID(), "Updated", "Description", "image.jpg",
                 new BigDecimal("100"), new BigDecimal("150"), LocalDateTime.now().plusHours(1), null);
     }
 }
