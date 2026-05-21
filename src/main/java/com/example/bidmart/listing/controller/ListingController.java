@@ -1,6 +1,7 @@
 package com.example.bidmart.listing.controller;
 
 import com.example.bidmart.listing.dto.CreateListingRequest;
+import com.example.bidmart.listing.dto.UpdateListingRequest;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.user.service.UserService;
@@ -76,13 +77,16 @@ public class ListingController {
         return userService.getUserIdByUsername(authentication.getName());
     }
 
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateListing(@PathVariable UUID id, @Valid @RequestBody Listing listing) {
+    public ResponseEntity<?> updateListing(@PathVariable UUID id, @Valid @RequestBody UpdateListingRequest request) {
         try {
-            Listing updated = listingService.updateListing(id, listing);
+            Listing updated = listingService.updateListing(id, request);
             return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
         }
     }
 

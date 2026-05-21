@@ -1,6 +1,7 @@
 package com.example.bidmart.listing.service;
 
 import com.example.bidmart.listing.dto.CreateListingRequest;
+import com.example.bidmart.listing.dto.UpdateListingRequest;
 import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
@@ -66,18 +67,21 @@ public class ListingService {
         return listingRepository.save(listing);
     }
 
-    public Listing updateListing(UUID id, Listing updatedListing) {
+    public Listing updateListing(UUID id, UpdateListingRequest request) {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
 
         validateListingForUpdate(existing);
+        validateReservePrice(request.startingPrice(), request.reservePrice());
 
-        existing.setTitle(updatedListing.getTitle());
-        existing.setDescription(updatedListing.getDescription());
-        existing.setImageUrl(updatedListing.getImageUrl());
-        existing.setStartingPrice(updatedListing.getStartingPrice());
-        existing.setReservePrice(updatedListing.getReservePrice());
-        existing.setEndTime(updatedListing.getEndTime());
+        existing.setCategoryId(request.categoryId());
+        existing.setTitle(request.title());
+        existing.setDescription(request.description());
+        existing.setImageUrl(request.imageUrl());
+        existing.setStartingPrice(request.startingPrice());
+        existing.setReservePrice(request.reservePrice());
+        existing.setEndTime(request.endTime());
+        existing.setAuctionType(request.auctionType() == null ? AuctionType.ENGLISH : request.auctionType());
         return listingRepository.save(existing);
     }
 
