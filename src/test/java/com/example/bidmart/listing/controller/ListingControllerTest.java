@@ -1,5 +1,6 @@
 package com.example.bidmart.listing.controller;
 
+import com.example.bidmart.listing.dto.PaginatedResponse;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
@@ -12,9 +13,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -91,12 +96,14 @@ class ListingControllerTest {
 
     @Test
     void getAllListings_shouldReturnOk() {
-        when(listingService.getAllListings()).thenReturn(List.of(listing));
+        when(listingService.getAllListings(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(listing)));
 
-        ResponseEntity<List<Listing>> response = listingController.getAllListings();
+        ResponseEntity<PaginatedResponse<Listing>> response = listingController.getAllListings(0, 20);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, response.getBody().content().size());
+        assertEquals(0, response.getBody().page());
+        assertTrue(response.getBody().last());
     }
 
     @Test
@@ -145,24 +152,24 @@ class ListingControllerTest {
 
     @Test
     void searchListings_shouldReturnListings() {
-        when(listingService.searchListings("test", null, null, null))
-                .thenReturn(List.of(listing));
+        when(listingService.searchListings(eq("test"), eq(null), eq(null), eq(null), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(listing)));
 
-        ResponseEntity<List<Listing>> response = listingController.searchListings("test", null, null, null);
+        ResponseEntity<PaginatedResponse<Listing>> response = listingController.searchListings("test", null, null, null, 0, 20);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
+        assertEquals(1, response.getBody().content().size());
     }
 
     @Test
     void searchListings_shouldReturnEmptyList() {
-        when(listingService.searchListings("nonexistent", null, null, null))
-                .thenReturn(List.of());
+        when(listingService.searchListings(eq("nonexistent"), eq(null), eq(null), eq(null), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
-        ResponseEntity<List<Listing>> response = listingController.searchListings("nonexistent", null, null, null);
+        ResponseEntity<PaginatedResponse<Listing>> response = listingController.searchListings("nonexistent", null, null, null, 0, 20);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(0, response.getBody().size());
+        assertEquals(0, response.getBody().content().size());
     }
 
     @Test
@@ -174,22 +181,22 @@ class ListingControllerTest {
         activeListing.setEndTime(LocalDateTime.now().plusHours(2));
         activeListing.setStatus(AuctionStatus.ACTIVE);
 
-        when(listingService.getActiveListings()).thenReturn(List.of(activeListing));
+        when(listingService.getActiveListings(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(activeListing)));
 
-        ResponseEntity<List<Listing>> response = listingController.getActiveListings();
+        ResponseEntity<PaginatedResponse<Listing>> response = listingController.getActiveListings(0, 20);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
-        assertEquals(AuctionStatus.ACTIVE, response.getBody().get(0).getStatus());
+        assertEquals(1, response.getBody().content().size());
+        assertEquals(AuctionStatus.ACTIVE, response.getBody().content().get(0).getStatus());
     }
 
     @Test
     void getActiveListings_shouldReturnEmptyWhenNoActiveListings() {
-        when(listingService.getActiveListings()).thenReturn(List.of());
+        when(listingService.getActiveListings(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
 
-        ResponseEntity<List<Listing>> response = listingController.getActiveListings();
+        ResponseEntity<PaginatedResponse<Listing>> response = listingController.getActiveListings(0, 20);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(0, response.getBody().size());
+        assertEquals(0, response.getBody().content().size());
     }
 }

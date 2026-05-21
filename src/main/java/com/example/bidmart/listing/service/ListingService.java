@@ -3,6 +3,8 @@ package com.example.bidmart.listing.service;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,10 @@ public class ListingService {
 
     public List<Listing> getAllListings() {
         return listingRepository.findAll();
+    }
+
+    public Page<Listing> getAllListings(Pageable pageable) {
+        return listingRepository.findAll(pageable);
     }
 
     public Optional<Listing> getListingById(UUID id) {
@@ -93,7 +99,28 @@ public class ListingService {
         return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
     }
 
+    public Page<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        UUID categoryId = parseCategoryId(category);
+        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice, pageable);
+    }
+
     public List<Listing> getActiveListings() {
         return listingRepository.findActiveListings();
+    }
+
+    public Page<Listing> getActiveListings(Pageable pageable) {
+        return listingRepository.findActiveListings(pageable);
+    }
+
+    private UUID parseCategoryId(String category) {
+        if (category == null || category.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return UUID.fromString(category);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

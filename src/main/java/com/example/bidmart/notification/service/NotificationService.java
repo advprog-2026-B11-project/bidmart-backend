@@ -112,9 +112,12 @@ public class NotificationService {
     }
 
     @Transactional
-    public Notification markAsRead(UUID notificationId) {
+    public Notification markAsRead(UUID notificationId, UUID userId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Notif tidak ditemukan"));
+        if (!notification.getUserId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Access Denied");
+        }
         notification.setRead(true);
         return notificationRepository.save(notification);
     }
@@ -127,7 +130,12 @@ public class NotificationService {
     }
 
     @Transactional
-    public void deleteNotification(UUID notificationId) {
-        notificationRepository.deleteById(notificationId);
+    public void deleteNotification(UUID notificationId, UUID userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notif tidak ditemukan"));
+        if (!notification.getUserId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Access Denied");
+        }
+        notificationRepository.delete(notification);
     }
 }
