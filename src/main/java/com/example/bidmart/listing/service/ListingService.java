@@ -2,6 +2,7 @@ package com.example.bidmart.listing.service;
 
 import com.example.bidmart.listing.dto.CreateListingRequest;
 import com.example.bidmart.listing.dto.UpdateListingRequest;
+import org.springframework.security.access.AccessDeniedException;
 import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
@@ -67,10 +68,11 @@ public class ListingService {
         return listingRepository.save(listing);
     }
 
-    public Listing updateListing(UUID id, UpdateListingRequest request) {
+    public Listing updateListing(UUID id, UpdateListingRequest request, UUID userId, boolean admin) {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
 
+        validateListingOwnership(existing, userId, admin);
         validateListingNotActive(existing, "diupdate");
         validateReservePrice(request.startingPrice(), request.reservePrice());
 
@@ -91,10 +93,17 @@ public class ListingService {
         }
     }
 
-    public void deleteListing(UUID id) {
+    private void validateListingOwnership(Listing listing, UUID userId, boolean admin) {
+        if (!admin && !listing.getSellerId().equals(userId)) {
+            throw new AccessDeniedException("User tidak memiliki akses ke listing ini.");
+        }
+    }
+
+    public void deleteListing(UUID id, UUID userId, boolean admin) {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
 
+        validateListingOwnership(existing, userId, admin);
         validateListingNotActive(existing, "dihapus");
 
         listingRepository.delete(existing);

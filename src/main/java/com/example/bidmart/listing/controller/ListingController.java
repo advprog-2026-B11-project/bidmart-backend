@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.access.AccessDeniedException;
 import java.math.BigDecimal;
 import jakarta.validation.Valid;
 
@@ -79,10 +80,17 @@ public class ListingController {
 
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateListing(@PathVariable UUID id, @Valid @RequestBody UpdateListingRequest request) {
+    public ResponseEntity<?> updateListing(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateListingRequest request,
+            Authentication authentication
+    ) {
         try {
-            Listing updated = listingService.updateListing(id, request);
+            UUID userId = resolveCurrentUserId(authentication);
+            Listing updated = listingService.updateListing(id, request, userId, isAdmin(authentication));
             return ResponseEntity.ok(updated);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (RuntimeException e) {
@@ -92,14 +100,22 @@ public class ListingController {
 
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteListing(@PathVariable UUID id) {
+    public ResponseEntity<?> deleteListing(@PathVariable UUID id, Authentication authentication) {
         try {
-            listingService.deleteListing(id);
+            UUID userId = resolveCurrentUserId(authentication);
+            listingService.deleteListing(id, userId, isAdmin(authentication));
             return ResponseEntity.noContent().build();
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 }
