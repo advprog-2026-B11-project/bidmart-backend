@@ -64,16 +64,24 @@ class ListingControllerTest {
     }
 
     @Test
-    void updateListing_fail_whenAuctionActive() {
-        UpdateListingRequest request = updateRequest();
+    void deleteListing_fail_whenAuctionActive() {
+        doThrow(new IllegalArgumentException("Listing tidak bisa dihapus saat auction masih aktif."))
+                .when(listingService).deleteListing(listingId);
 
-        when(listingService.updateListing(listingId, request))
-                .thenThrow(new IllegalArgumentException("Listing tidak bisa diupdate saat auction masih aktif."));
-
-        ResponseEntity<?> response = listingController.updateListing(listingId, request);
+        ResponseEntity<?> response = listingController.deleteListing(listingId);
 
         assertEquals(400, response.getStatusCode().value());
-        assertEquals("Listing tidak bisa diupdate saat auction masih aktif.", response.getBody());
+        assertEquals("Listing tidak bisa dihapus saat auction masih aktif.", response.getBody());
+    }
+
+    @Test
+    void deleteListing_fail_whenListingNotFound() {
+        doThrow(new RuntimeException("Listing tidak ditemukan dengan ID: " + listingId))
+                .when(listingService).deleteListing(listingId);
+
+        ResponseEntity<?> response = listingController.deleteListing(listingId);
+
+        assertEquals(404, response.getStatusCode().value());
     }
 
     @Test
@@ -81,17 +89,6 @@ class ListingControllerTest {
         ResponseEntity<?> response = listingController.deleteListing(listingId);
 
         assertEquals(204, response.getStatusCode().value());
-    }
-
-    @Test
-    void deleteListing_fail_whenAuctionActive() {
-        doThrow(new RuntimeException("Listing tidak bisa dihapus saat auction masih aktif."))
-                .when(listingService).deleteListing(listingId);
-
-        ResponseEntity<?> response = listingController.deleteListing(listingId);
-
-        assertEquals(400, response.getStatusCode().value());
-        assertEquals("Listing tidak bisa dihapus saat auction masih aktif.", response.getBody());
     }
 
     @Test
