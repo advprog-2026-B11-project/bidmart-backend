@@ -1,5 +1,6 @@
 package com.example.bidmart.listing.controller;
 
+import com.example.bidmart.listing.dto.CreateListingRequest;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
@@ -124,13 +125,14 @@ class ListingControllerTest {
     void createListing_shouldReturnCreatedListing() {
         Authentication authentication = mock(Authentication.class);
         UUID sellerId = UUID.randomUUID();
+        CreateListingRequest request = createRequest();
 
         when(authentication.getName()).thenReturn("karla");
         when(userService.getUserIdByUsername("karla")).thenReturn(sellerId);
-        when(listingService.createListing(listing, sellerId)).thenReturn(listing);
+        when(listingService.createListing(request, sellerId)).thenReturn(listing);
 
         ResponseEntity<Listing> response =
-                listingController.createListing(listing, authentication);
+                listingController.createListing(request, authentication);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(listingId, response.getBody().getId());
@@ -138,8 +140,10 @@ class ListingControllerTest {
 
     @Test
     void createListing_shouldFail_whenAuthenticationNull() {
+        CreateListingRequest request = createRequest();
+
         assertThrows(Exception.class, () -> {
-            listingController.createListing(listing, null);
+            listingController.createListing(request, null);
         });
     }
 
@@ -191,5 +195,10 @@ class ListingControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(0, response.getBody().size());
+    }
+
+    private CreateListingRequest createRequest() {
+        return new CreateListingRequest(UUID.randomUUID(), "Test", "Description", "image.jpg",
+                new BigDecimal("100"), new BigDecimal("150"), LocalDateTime.now().plusHours(1), null);
     }
 }

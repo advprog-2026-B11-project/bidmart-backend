@@ -1,5 +1,6 @@
 package com.example.bidmart.listing.controller;
 
+import com.example.bidmart.listing.dto.CreateListingRequest;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.user.service.UserService;
@@ -10,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.security.access.prepost.PreAuthorize;
 import java.math.BigDecimal;
 import jakarta.validation.Valid;
@@ -28,16 +28,17 @@ public class ListingController {
         this.userService = userService;
     }
 
-    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')") @PostMapping
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    @PostMapping
     public ResponseEntity<Listing> createListing(
-            @Valid @RequestBody Listing listing,
+            @Valid @RequestBody CreateListingRequest request,
             Authentication authentication
     ) {
         UUID sellerId = resolveCurrentUserId(authentication);
-        Listing created = listingService.createListing(listing, sellerId);
+        Listing created = listingService.createListing(request, sellerId);
         return ResponseEntity.ok(created);
     }
-
+    
     @GetMapping
     public ResponseEntity<List<Listing>> getAllListings() {
         return ResponseEntity.ok(listingService.getAllListings());

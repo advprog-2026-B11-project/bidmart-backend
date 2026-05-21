@@ -1,5 +1,7 @@
 package com.example.bidmart.listing.service;
 
+import com.example.bidmart.listing.dto.CreateListingRequest;
+import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
@@ -21,15 +23,29 @@ public class ListingService {
         this.listingRepository = listingRepository;
     }
 
-    public Listing createListing(Listing listing, UUID sellerId) {
+    public Listing createListing(CreateListingRequest request, UUID sellerId) {
+        validateReservePrice(request.startingPrice(), request.reservePrice());
+
+        Listing listing = new Listing();
         listing.setSellerId(sellerId);
+        listing.setCategoryId(request.categoryId());
+        listing.setTitle(request.title());
+        listing.setDescription(request.description());
+        listing.setImageUrl(request.imageUrl());
+        listing.setStartingPrice(request.startingPrice());
+        listing.setReservePrice(request.reservePrice());
+        listing.setEndTime(request.endTime());
+        listing.setStatus(AuctionStatus.ACTIVE);
+        listing.setAuctionType(request.auctionType() == null ? AuctionType.ENGLISH : request.auctionType());
         listing.setCreatedAt(LocalDateTime.now());
 
-        if (listing.getStatus() == null) {
-            listing.setStatus(AuctionStatus.ACTIVE);
-        }
-
         return listingRepository.save(listing);
+    }
+
+    private void validateReservePrice(BigDecimal startingPrice, BigDecimal reservePrice) {
+        if (reservePrice != null && startingPrice != null && reservePrice.compareTo(startingPrice) < 0) {
+            throw new IllegalArgumentException("Reserve price tidak boleh lebih kecil dari starting price.");
+        }
     }
 
     public List<Listing> getAllListings() {

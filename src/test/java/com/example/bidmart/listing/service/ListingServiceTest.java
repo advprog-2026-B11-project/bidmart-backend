@@ -1,5 +1,7 @@
 package com.example.bidmart.listing.service;
 
+import com.example.bidmart.listing.dto.CreateListingRequest;
+import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
@@ -17,7 +19,7 @@ import java.util.UUID;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -279,87 +281,80 @@ class ListingServiceTest {
     }
 
     @Test
-    void createListing_shouldSetSellerIdAndDefaultStatus() {
+    void createListing_shouldSetSellerIdDefaultStatusAndRequestFields() {
         UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setStatus(null);
+        UUID categoryId = UUID.randomUUID();
+        CreateListingRequest request = createRequest(categoryId, "Test Listing", new BigDecimal("100"),
+                new BigDecimal("150"), LocalDateTime.now().plusHours(1), AuctionType.ENGLISH);
+
         when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        Listing result = listingService.createListing(newListing, sellerId);
+        Listing result = listingService.createListing(request, sellerId);
 
         assertEquals(sellerId, result.getSellerId());
+        assertEquals(categoryId, result.getCategoryId());
+        assertEquals("Test Listing", result.getTitle());
         assertEquals(AuctionStatus.ACTIVE, result.getStatus());
+        assertEquals(AuctionType.ENGLISH, result.getAuctionType());
         assertNotNull(result.getCreatedAt());
     }
 
     @Test
-    void createListing_shouldKeepExistingStatus() {
+    void createListing_shouldDefaultAuctionTypeToEnglishWhenRequestAuctionTypeNull() {
         UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setStatus(AuctionStatus.CLOSED);
-        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        Listing result = listingService.createListing(newListing, sellerId);
+        CreateListingRequest request = createRequest(UUID.randomUUID(), "Test Listing", new BigDecimal("100"),
+                null, LocalDateTime.now().plusHours(1), null);
 
-        assertEquals(AuctionStatus.CLOSED, result.getStatus());
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Listing result = listingService.createListing(request, sellerId);
+
+        assertEquals(AuctionType.ENGLISH, result.getAuctionType());
     }
 
     @Test
     void createListing_shouldValidateEndTimeInFuture() {
         UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("Test Listing");
-        newListing.setStartingPrice(new BigDecimal("100"));
-        newListing.setEndTime(LocalDateTime.now().minusHours(1));
+        CreateListingRequest request = createRequest(UUID.randomUUID(), "Test Listing",
+                new BigDecimal("100"), null, LocalDateTime.now().minusHours(1), null);
 
         when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("endTime harus di masa depan"));
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+        assertThrows(RuntimeException.class, () -> listingService.createListing(request, sellerId));
     }
 
     @Test
     void createListing_shouldValidateStartingPriceGreaterThanZero() {
         UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("Test Listing");
-        newListing.setStartingPrice(new BigDecimal("0"));
-        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+        CreateListingRequest request = createRequest(UUID.randomUUID(), "Test Listing",
+                new BigDecimal("0"), null, LocalDateTime.now().plusHours(1), null);
 
         when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("startingPrice harus > 0"));
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+        assertThrows(RuntimeException.class, () -> listingService.createListing(request, sellerId));
     }
 
     @Test
     void createListing_shouldValidateReservePriceGreaterThanOrEqualStartingPrice() {
         UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("Test Listing");
-        newListing.setStartingPrice(new BigDecimal("100"));
-        newListing.setReservePrice(new BigDecimal("50"));
-        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+        CreateListingRequest request = createRequest(UUID.randomUUID(), "Test Listing",
+                new BigDecimal("100"), new BigDecimal("50"), LocalDateTime.now().plusHours(1), null);
 
-        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("reservePrice harus >= startingPrice"));
-
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+        assertThrows(IllegalArgumentException.class, () -> listingService.createListing(request, sellerId));
     }
 
     @Test
     void createListing_shouldValidateTitleNotBlank() {
         UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("");
-        newListing.setStartingPrice(new BigDecimal("100"));
-        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+        CreateListingRequest request = createRequest(UUID.randomUUID(), "",
+                new BigDecimal("100"), null, LocalDateTime.now().plusHours(1), null);
 
         when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("title tidak boleh blank"));
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+        assertThrows(RuntimeException.class, () -> listingService.createListing(request, sellerId));
+    }
+
+    private CreateListingRequest createRequest(UUID categoryId, String title, BigDecimal startingPrice,
+                                               BigDecimal reservePrice, LocalDateTime endTime, AuctionType auctionType) {
+        return new CreateListingRequest(categoryId, title, "Description", "image.jpg",
+                startingPrice, reservePrice, endTime, auctionType);
     }
 }
