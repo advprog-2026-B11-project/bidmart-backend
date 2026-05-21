@@ -104,6 +104,58 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void register_shouldUseRequestedSellerRole() {
+        Role sellerRole = new Role(UUID.randomUUID(), "SELLER", new HashSet<>());
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("selleruser");
+        request.setEmail("seller@mail.com");
+        request.setPassword("password123");
+        request.setDisplayName("Seller User");
+        request.setRole("SELLER");
+
+        when(userRepository.existsByUsername(request.getUsername())).thenReturn(false);
+        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
+        when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded-password");
+        when(roleRepository.findByName("SELLER")).thenReturn(Optional.of(sellerRole));
+
+        User savedUser = new User();
+        savedUser.setUsername(request.getUsername());
+        savedUser.setEmail(request.getEmail());
+        savedUser.setDisplayName(request.getDisplayName());
+        savedUser.setRole(sellerRole);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+        AuthResponse response = authService.register(request);
+
+        assertEquals("SELLER", response.getRole());
+        verify(roleRepository).findByName("SELLER");
+        verify(userRepository).save(argThat(user -> user.getRole().getName().equals("SELLER")));
+    }
+
+    @Test
+    void register_shouldRejectAdminRole() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("adminuser");
+        request.setEmail("admin@mail.com");
+        request.setPassword("password123");
+        request.setDisplayName("Admin User");
+        request.setRole("ADMIN");
+
+        when(userRepository.existsByUsername(request.getUsername())).thenReturn(false);
+        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.register(request)
+        );
+
+        assertEquals("Role must be USER or SELLER.", exception.getMessage());
+        verify(roleRepository, never()).findByName(anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     void register_shouldThrowExceptionIfUsernameExists() {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("existinguser");

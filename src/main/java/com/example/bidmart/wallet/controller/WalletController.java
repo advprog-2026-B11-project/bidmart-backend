@@ -57,14 +57,16 @@ public class WalletController {
         return getBalance(authentication);
     }
 
-    @PostMapping("/{userId}/top-up")
+    @PostMapping({"/{userId}/top-up", "/topup", "/top-up"})
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<WalletResponse> topUp(
-            @PathVariable UUID userId,
+            @PathVariable(required = false) UUID userId,
             @RequestBody TopUpRequest request,
             Authentication authentication
     ) {
-        ensureCurrentUser(userId, authentication);
+        if (userId != null) {
+            ensureCurrentUser(userId, authentication);
+        }
         UUID authenticatedUserId = resolveCurrentUserId(authentication);
         Wallet wallet = walletService.topUp(authenticatedUserId, request);
 

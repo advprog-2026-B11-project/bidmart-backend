@@ -93,6 +93,9 @@ public class Listing {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
+        if (auctionType == null) {
+            auctionType = AuctionType.ENGLISH;
+        }
     }
 
     public void updateHighestBid(UUID bidderId, BigDecimal amount) {
