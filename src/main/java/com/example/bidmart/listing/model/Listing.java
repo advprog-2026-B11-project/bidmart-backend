@@ -34,7 +34,9 @@ import jakarta.validation.constraints.NotBlank;
         @Index(name = "idx_listing_status", columnList = "status"),
         @Index(name = "idx_listing_end_time", columnList = "end_time"),
         @Index(name = "idx_listing_seller_id", columnList = "seller_id"),
-        @Index(name = "idx_listing_category_id", columnList = "category_id")
+        @Index(name = "idx_listing_category_id", columnList = "category_id"),
+        @Index(name = "idx_listing_starting_price", columnList = "starting_price"),
+        @Index(name = "idx_listing_category_price", columnList = "category_id, starting_price")
 })
 public class Listing {
 

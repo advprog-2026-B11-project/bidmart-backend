@@ -62,6 +62,10 @@ public class ListingService {
         }
     }
 
+    private String normalizeKeyword(String keyword) {
+        return keyword == null || keyword.isBlank() ? null : keyword.trim();
+    }
+
     public List<Listing> getAllListings() {
         return listingRepository.findAll();
     }
@@ -132,7 +136,7 @@ public class ListingService {
                 categoryId = null;
             }
         }
-        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
+        return listingRepository.findBySearchCriteria(normalizeKeyword(keyword), categoryId, minPrice, maxPrice);
     }
 
     public List<Listing> getActiveListings() {
