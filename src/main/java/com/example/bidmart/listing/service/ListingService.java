@@ -87,8 +87,7 @@ public class ListingService {
 
     private void validateListingForUpdate(Listing listing) {
         if (listing.getStatus() != null && listing.getStatus().isActive()) {
-            throw new RuntimeException(
-                    "Listing tidak bisa diupdate saat auction masih aktif.");
+            throw new IllegalArgumentException("Listing tidak bisa diupdate saat auction masih aktif.");
         }
     }
 
