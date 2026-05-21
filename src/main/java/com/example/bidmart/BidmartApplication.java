@@ -1,5 +1,6 @@
 package com.example.bidmart;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.retry.annotation.EnableRetry;
@@ -12,8 +13,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class BidmartApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(BidmartApplication.class, args);
-	}
+    public static void main(String[] args) {
+        Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
+        dotenv.entries().forEach(e ->
+            System.setProperty(e.getKey(), e.getValue())
+        );
+        SpringApplication.run(BidmartApplication.class, args);
+    }
 
 }
