@@ -110,7 +110,8 @@ class NotificationControllerFunctionalTest {
     @Test
     void testMarkAsRead_ShouldReturnUpdatedNotification() throws Exception {
         notification.setRead(true);
-        when(notificationService.markAsRead(notificationId)).thenReturn(notification);
+        mockCurrentUser();
+        when(notificationService.markAsRead(notificationId, userId)).thenReturn(notification);
 
         mockMvc.perform(patch("/api/notifications/{notificationId}/read", notificationId)
                 .principal(mockPrincipal())
@@ -133,7 +134,8 @@ class NotificationControllerFunctionalTest {
 
     @Test
     void testDeleteNotification_ShouldReturnSuccessMessage() throws Exception {
-        doNothing().when(notificationService).deleteNotification(notificationId);
+        mockCurrentUser();
+        doNothing().when(notificationService).deleteNotification(notificationId, userId);
 
         mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
                 .principal(mockPrincipal())
@@ -188,7 +190,8 @@ class NotificationControllerFunctionalTest {
 
     @Test
     void testMarkAsRead_NotificationNotFound_ShouldReturn404() throws Exception {
-        when(notificationService.markAsRead(any(UUID.class)))
+        mockCurrentUser();
+        when(notificationService.markAsRead(any(UUID.class), any(UUID.class)))
                 .thenThrow(new ResourceNotFoundException("Notifikasi tidak ditemukan"));
 
         mockMvc.perform(patch("/api/notifications/{notificationId}/read", UUID.randomUUID())
