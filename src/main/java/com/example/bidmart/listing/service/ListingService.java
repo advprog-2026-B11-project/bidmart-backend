@@ -71,7 +71,7 @@ public class ListingService {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
 
-        validateListingForUpdate(existing);
+        validateListingNotActive(existing, "diupdate");
         validateReservePrice(request.startingPrice(), request.reservePrice());
 
         existing.setCategoryId(request.categoryId());
@@ -85,9 +85,9 @@ public class ListingService {
         return listingRepository.save(existing);
     }
 
-    private void validateListingForUpdate(Listing listing) {
+    private void validateListingNotActive(Listing listing, String action) {
         if (listing.getStatus() != null && listing.getStatus().isActive()) {
-            throw new IllegalArgumentException("Listing tidak bisa diupdate saat auction masih aktif.");
+            throw new IllegalArgumentException("Listing tidak bisa " + action + " saat auction masih aktif.");
         }
     }
 
@@ -95,7 +95,7 @@ public class ListingService {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
 
-        validateListingForUpdate(existing);
+        validateListingNotActive(existing, "dihapus");
 
         listingRepository.delete(existing);
     }

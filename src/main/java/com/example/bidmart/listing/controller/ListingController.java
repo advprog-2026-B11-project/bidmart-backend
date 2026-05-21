@@ -90,13 +90,16 @@ public class ListingController {
         }
     }
 
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteListing(@PathVariable UUID id) {
         try {
             listingService.deleteListing(id);
             return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
         }
     }
 }
