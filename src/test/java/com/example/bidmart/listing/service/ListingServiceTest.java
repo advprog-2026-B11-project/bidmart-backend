@@ -33,6 +33,7 @@ class ListingServiceTest {
     private ListingService listingService;
 
     private UUID listingId;
+    private UUID ownerId;
     private Listing listing;
 
     @BeforeEach
@@ -41,7 +42,8 @@ class ListingServiceTest {
 
         listing = new Listing();
         listing.setId(listingId);
-        listing.setSellerId(UUID.randomUUID());
+        ownerId = UUID.randomUUID();
+        listing.setSellerId(ownerId);
         listing.setStartingPrice(new BigDecimal("100"));
         listing.setEndTime(LocalDateTime.now().plusHours(1));
         listing.setStatus(AuctionStatus.ACTIVE);
@@ -53,7 +55,7 @@ class ListingServiceTest {
 
         UpdateListingRequest request = updateRequest();
 
-        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, request));
+        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, request, ownerId, false));
     }
 
     @Test
@@ -64,7 +66,7 @@ class ListingServiceTest {
         when(listingRepository.save(listing)).thenReturn(listing);
 
         UpdateListingRequest request = updateRequest();
-        Listing result = listingService.updateListing(listingId, request);
+        Listing result = listingService.updateListing(listingId, request, ownerId, false);
 
         assertEquals("Updated", result.getTitle());
     }
@@ -75,7 +77,7 @@ class ListingServiceTest {
                 .thenReturn(Optional.of(listing));
 
         assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId);
+            listingService.deleteListing(listingId, ownerId, false);
         });
     }
 
@@ -86,7 +88,7 @@ class ListingServiceTest {
         when(listingRepository.findById(listingId))
                 .thenReturn(Optional.of(listing));
 
-        listingService.deleteListing(listingId);
+        listingService.deleteListing(listingId, ownerId, false);
 
         verify(listingRepository).delete(listing);
     }
@@ -98,7 +100,7 @@ class ListingServiceTest {
 
         UpdateListingRequest request = updateRequest();
 
-        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, request));
+        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, request, ownerId, false));
     }
 
     @Test
@@ -107,7 +109,7 @@ class ListingServiceTest {
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
         assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId);
+            listingService.deleteListing(listingId, ownerId, false);
         });
     }
 
@@ -117,7 +119,7 @@ class ListingServiceTest {
 
         UpdateListingRequest request = updateRequest();
 
-        assertThrows(RuntimeException.class, () -> listingService.updateListing(listingId, request));
+        assertThrows(RuntimeException.class, () -> listingService.updateListing(listingId, request, ownerId, false));
     }
 
     @Test
@@ -125,7 +127,7 @@ class ListingServiceTest {
         when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId);
+            listingService.deleteListing(listingId, ownerId, false);
         });
     }
 
@@ -188,7 +190,7 @@ class ListingServiceTest {
         when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdateListingRequest request = updateRequest();
-        Listing result = listingService.updateListing(listingId, request);
+        Listing result = listingService.updateListing(listingId, request, ownerId, false);
 
         assertEquals("Updated", result.getTitle());
         assertEquals("Description", result.getDescription());
@@ -204,7 +206,7 @@ class ListingServiceTest {
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
         when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Listing result = listingService.updateListing(listingId, updateRequest());
+        Listing result = listingService.updateListing(listingId, updateRequest(), ownerId, false);
 
         assertEquals(AuctionStatus.CLOSED, result.getStatus());
     }
@@ -217,7 +219,7 @@ class ListingServiceTest {
 
         UpdateListingRequest request = new UpdateListingRequest(UUID.randomUUID(), "Updated", "Description", "image.jpg",
                 new BigDecimal("500"), new BigDecimal("700"), LocalDateTime.now().plusDays(1), null);
-        Listing result = listingService.updateListing(listingId, request);
+        Listing result = listingService.updateListing(listingId, request, ownerId, false);
 
         assertEquals(AuctionType.ENGLISH, result.getAuctionType());
     }
@@ -226,7 +228,7 @@ class ListingServiceTest {
     void deleteListing_shouldCallRepositoryDelete() {
         listing.setStatus(AuctionStatus.CLOSED);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        listingService.deleteListing(listingId);
+        listingService.deleteListing(listingId, ownerId, false);
 
         verify(listingRepository, times(1)).delete(listing);
     }

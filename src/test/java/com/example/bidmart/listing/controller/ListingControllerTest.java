@@ -7,6 +7,7 @@ import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.user.service.UserService;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,24 +52,37 @@ class ListingControllerTest {
         listing.setStatus(AuctionStatus.CLOSED);
     }
 
+    private Authentication authentication() {
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getName()).thenReturn("karla");
+        doReturn(List.<GrantedAuthority>of()).when(authentication).getAuthorities();
+        return authentication;
+    }
+
     @Test
     void updateListing_success() {
+        Authentication authentication = authentication();
+        UUID userId = UUID.randomUUID();
         UpdateListingRequest request = updateRequest();
 
-        when(listingService.updateListing(listingId, request)).thenReturn(listing);
+        when(userService.getUserIdByUsername("karla")).thenReturn(userId);
+        when(listingService.updateListing(listingId, request, userId, false)).thenReturn(listing);
 
-        ResponseEntity<?> response = listingController.updateListing(listingId, request);
-
+        ResponseEntity<?> response = listingController.updateListing(listingId, request, authentication);
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
     }
 
     @Test
     void deleteListing_fail_whenAuctionActive() {
-        doThrow(new IllegalArgumentException("Listing tidak bisa dihapus saat auction masih aktif."))
-                .when(listingService).deleteListing(listingId);
+        Authentication authentication = authentication();
+        UUID userId = UUID.randomUUID();
 
-        ResponseEntity<?> response = listingController.deleteListing(listingId);
+        when(userService.getUserIdByUsername("karla")).thenReturn(userId);
+        doThrow(new IllegalArgumentException("Listing tidak bisa dihapus saat auction masih aktif."))
+                .when(listingService).deleteListing(listingId, userId, false);
+
+        ResponseEntity<?> response = listingController.deleteListing(listingId, authentication);
 
         assertEquals(400, response.getStatusCode().value());
         assertEquals("Listing tidak bisa dihapus saat auction masih aktif.", response.getBody());
@@ -76,19 +90,28 @@ class ListingControllerTest {
 
     @Test
     void deleteListing_fail_whenListingNotFound() {
+        Authentication authentication = authentication();
+        UUID userId = UUID.randomUUID();
+
+        when(userService.getUserIdByUsername("karla")).thenReturn(userId);
         doThrow(new RuntimeException("Listing tidak ditemukan dengan ID: " + listingId))
-                .when(listingService).deleteListing(listingId);
+                .when(listingService).deleteListing(listingId, userId, false);
 
-        ResponseEntity<?> response = listingController.deleteListing(listingId);
-
+        ResponseEntity<?> response = listingController.deleteListing(listingId, authentication);
         assertEquals(404, response.getStatusCode().value());
     }
 
     @Test
     void deleteListing_success() {
-        ResponseEntity<?> response = listingController.deleteListing(listingId);
+        Authentication authentication = authentication();
+        UUID userId = UUID.randomUUID();
+
+        when(userService.getUserIdByUsername("karla")).thenReturn(userId);
+
+        ResponseEntity<?> response = listingController.deleteListing(listingId, authentication);
 
         assertEquals(204, response.getStatusCode().value());
+        verify(listingService).deleteListing(listingId, userId, false);
     }
 
     @Test
@@ -135,7 +158,7 @@ class ListingControllerTest {
         ResponseEntity<Listing> response =
                 listingController.createListing(request, authentication);
 
-        assertEquals(200, response.getStatusCode().value());
+        assertEquals(201, response.getStatusCode().value());
         assertEquals(listingId, response.getBody().getId());
     }
 
