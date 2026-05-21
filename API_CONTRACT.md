@@ -531,25 +531,40 @@ POST /api/listings
 ### 6.2 Get All Listings
 
 ```
-GET /api/listings
+GET /api/listings?page=0&size=20
 ```
 
 **Auth:** No
-**Response 200:** `List<Listing>`
+**Query Parameters:**
+- `page`: zero-based page index, default `0`
+- `size`: page size, default `20`, max `100`
+
+**Response 200:** `PaginatedResponse<Listing>`
+
+```json
+{
+  "content": [],
+  "page": 0,
+  "size": 20,
+  "totalElements": 0,
+  "totalPages": 0,
+  "last": true
+}
+```
 
 ### 6.3 Get Active Listings Only
 
 ```
-GET /api/listings/active
+GET /api/listings/active?page=0&size=20
 ```
 
 **Auth:** No
-**Response 200:** Listing dengan status `ACTIVE` atau `EXTENDED` saja.
+**Response 200:** `PaginatedResponse<Listing>` dengan status `ACTIVE` atau `EXTENDED` saja.
 
 ### 6.4 Search Listings
 
 ```
-GET /api/listings/search?keyword=...&category=...&minPrice=...&maxPrice=...
+GET /api/listings/search?keyword=...&category=...&minPrice=...&maxPrice=...&page=0&size=20
 ```
 
 **Auth:** No
@@ -557,6 +572,10 @@ GET /api/listings/search?keyword=...&category=...&minPrice=...&maxPrice=...
 - `keyword`: cari di title + description (case-insensitive)
 - `category`: UUID category
 - `minPrice`, `maxPrice`: BigDecimal
+- `page`: zero-based page index, default `0`
+- `size`: page size, default `20`, max `100`
+
+**Response 200:** `PaginatedResponse<Listing>`
 
 **Response 200:** `List<Listing>`
 
