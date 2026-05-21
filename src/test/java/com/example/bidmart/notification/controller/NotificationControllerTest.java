@@ -85,7 +85,9 @@ class NotificationControllerTest {
     @Test
     void markAsRead_returnsOk() {
         notification.setRead(true);
-        when(notificationService.markAsRead(notificationId)).thenReturn(notification);
+        when(authentication.getName()).thenReturn("testuser");
+        when(userService.getUserIdByUsername("testuser")).thenReturn(userId);
+        when(notificationService.markAsRead(notificationId, userId)).thenReturn(notification);
         
         ResponseEntity<Notification> response = notificationController.markAsRead(notificationId, authentication);
         
@@ -122,8 +124,10 @@ class NotificationControllerTest {
 
     @Test
     void deleteNotification_returnsOk() {
-        doNothing().when(notificationService).deleteNotification(notificationId);
-        ResponseEntity<Map<String, String>> response = notificationController.deleteNotification(notificationId);
+        when(authentication.getName()).thenReturn("testuser");
+        when(userService.getUserIdByUsername("testuser")).thenReturn(userId);
+        doNothing().when(notificationService).deleteNotification(notificationId, userId);
+        ResponseEntity<Map<String, String>> response = notificationController.deleteNotification(notificationId, authentication);
         
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
