@@ -36,8 +36,31 @@ out/
 ### VS Code ###
 .vscode/
 
-
-# local credential
-application-local.properties
+### Environment & Credentials ###
 .env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+
+### Spring Boot Local Config ###
+application-local.properties
+application-secrets.properties
+**/application-local.properties
+
+### Logs ###
+*.log
+logs/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Temporary ###
+*.tmp
+*.bak
+*.swp
+*~
+
+### Project Specific ###
 Rulebook.md
