@@ -22,7 +22,7 @@ repositories {
 }
 
 dependencies {
-//	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -50,12 +50,25 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
+    exclude '**/*FunctionalTest.class'
+    finalizedBy jacocoTestReport
+}
 
-	filter {
-		excludeTestsMatching "*FunctionalTest"
-	}
-	finalizedBy jacocoTestReport
+task functionalTest(type: Test) {
+    group = 'verification'
+    include '**/*FunctionalTest.class'
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn test
+    executionData fileTree(layout.buildDirectory.get()).include("jacoco/*.exec")
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
 tasks.named('jacocoTestReport') {
@@ -68,7 +81,7 @@ tasks.named('jacocoTestReport') {
 
 sonar {
 	properties {
-		property "sonar.projectKey", "advprog-2026-b11-project_bidmart-backend"
+		property "sonar.projectKey", "advprog-2026-b11-project_bidmart-backend-2"
 		property "sonar.organization", "advprog-2026-b11-project"
 	}
 }
