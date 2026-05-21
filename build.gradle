@@ -68,7 +68,7 @@ tasks.named('jacocoTestReport') {
 
 sonar {
 	properties {
-		property "sonar.projectKey", "advprog-2026-b11-project_bidmart-backend"
+		property "sonar.projectKey", "advprog-2026-b11-project_bidmart-backend-2"
 		property "sonar.organization", "advprog-2026-b11-project"
 	}
 }
