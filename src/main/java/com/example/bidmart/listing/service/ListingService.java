@@ -122,18 +122,18 @@ public class ListingService {
     }
 
     public List<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice) {
-    validatePriceRange(minPrice, maxPrice);
+        validatePriceRange(minPrice, maxPrice);
 
-    UUID categoryId = null;
-    if (category != null && !category.isEmpty()) {
-        try {
-            categoryId = UUID.fromString(category);
-        } catch (IllegalArgumentException e) {
-            categoryId = null;
+        UUID categoryId = null;
+        if (category != null && !category.isEmpty()) {
+            try {
+                categoryId = UUID.fromString(category);
+            } catch (IllegalArgumentException e) {
+                categoryId = null;
+            }
         }
+        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
     }
-    return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
-}
 
     public List<Listing> getActiveListings() {
         return listingRepository.findActiveListings();

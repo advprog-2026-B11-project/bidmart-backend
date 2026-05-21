@@ -13,8 +13,8 @@ import java.util.UUID;
 public record UpdateListingRequest(
         @NotNull UUID categoryId,
         @NotBlank String title,
-        String description,
-        String imageUrl,
+        @Pattern(regexp = ".*\\S.*") String description,
+        @Pattern(regexp = ".*\\S.*") String imageUrl,
         @NotNull @DecimalMin("0.01") BigDecimal startingPrice,
         @DecimalMin("0.01") BigDecimal reservePrice,
         @NotNull @Future LocalDateTime endTime,
