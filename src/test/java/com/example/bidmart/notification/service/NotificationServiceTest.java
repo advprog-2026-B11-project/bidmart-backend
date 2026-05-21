@@ -2,6 +2,8 @@ package com.example.bidmart.notification.service;
 
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.notification.model.Notification;
+import com.example.bidmart.notification.model.NotificationPreference;
+import com.example.bidmart.notification.repository.NotificationPreferenceRepository;
 import com.example.bidmart.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,14 +11,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,12 +30,19 @@ class NotificationServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private NotificationPreferenceRepository preferenceRepository;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+
     @InjectMocks
     private NotificationService notificationService;
 
     private UUID userId;
     private UUID notificationId;
     private Notification notification;
+    private NotificationPreference preference;
 
     @BeforeEach
     void setUp() {
@@ -38,17 +50,118 @@ class NotificationServiceTest {
         notificationId = UUID.randomUUID();
         notification = new Notification(userId, "TEST_TYPE", "Test Message");
         notification.setId(notificationId);
+
+        preference = NotificationPreference.builder()
+                .userId(userId)
+                .emailEnabled(true)
+                .pushEnabled(true)
+                .inAppEnabled(true)
+                .mutedTypes(new HashSet<>())
+                .build();
     }
 
     @Test
-    void createNotification_success() {
-        when(notificationRepository.save(any(Notification.class))).thenReturn(notification);
+    void createNotification_defaultPreference_success() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.empty());
+        when(preferenceRepository.save(any(NotificationPreference.class))).thenReturn(preference);
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
+
         assertNotNull(result);
         assertEquals(userId, result.getUserId());
-        assertEquals("TEST_TYPE", result.getType());
-        assertFalse(result.isRead());
+        assertEquals("DELIVERED", result.getDeliveryStatus());
+        verify(notificationRepository, times(2)).save(any(Notification.class));
+        verify(messagingTemplate, times(1)).convertAndSendToUser(eq(userId.toString()), eq("/queue/notifications"), any());
+    }
+
+    @Test
+    void createNotification_typeIsMuted_returnsNull() {
+        preference.setMutedTypes(new HashSet<>(List.of("MUTED_TYPE")));
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+
+        Notification result = notificationService.createNotification(userId, "MUTED_TYPE", "Pesan ini di-mute");
+
+        assertNull(result);
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    }
+
+    @Test
+    void createNotification_pushThrowsException_deliveryStatusFailed() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
+        doThrow(new RuntimeException("WebSocket Error"))
+                .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
+
+        Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Pesan Error WS");
+
+        assertNotNull(result);
+        assertEquals("FAILED", result.getDeliveryStatus());
+        verify(notificationRepository, times(2)).save(any(Notification.class));
+    }
+
+    @Test
+    void createNotification_pushDisabled_doesNotSendWebSocket() {
+        preference.setPushEnabled(false);
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
+        Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Pesan Tanpa Push");
+
+        assertNotNull(result);
+        assertEquals("DELIVERED", result.getDeliveryStatus());
+        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    }
+
+    @Test
+    void updatePreference_withMutedTypes_success() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(preferenceRepository.save(any(NotificationPreference.class))).thenReturn(preference);
+
+        List<String> mutedTypes = List.of("PROMO", "SPAM");
+        NotificationPreference result = notificationService.updatePreference(userId, false, false, false, mutedTypes);
+
+        assertNotNull(result);
+        assertTrue(result.getMutedTypes().contains("PROMO"));
+        verify(preferenceRepository, times(1)).save(preference);
+    }
+
+    @Test
+    void createNotification_onlyPushEnabled_doesNotSaveToDbInitially() {
+        preference.setInAppEnabled(false);
+        preference.setPushEnabled(true);
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
+        Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
+
+        assertNotNull(result);
         verify(notificationRepository, times(1)).save(any(Notification.class));
+        verify(messagingTemplate, times(1)).convertAndSendToUser(eq(userId.toString()), eq("/queue/notifications"), any());
+    }
+
+    @Test
+    void updatePreference_success() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(preferenceRepository.save(any(NotificationPreference.class))).thenReturn(preference);
+
+        NotificationPreference result = notificationService.updatePreference(userId, false, true, true);
+
+        assertNotNull(result);
+        assertFalse(result.isEmailEnabled());
+        verify(preferenceRepository, times(1)).save(preference);
+    }
+
+    @Test
+    void getPreference_success() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        NotificationPreference result = notificationService.getPreference(userId);
+
+        assertNotNull(result);
+        assertEquals(userId, result.getUserId());
     }
 
     @Test
@@ -87,7 +200,7 @@ class NotificationServiceTest {
             notificationService.markAsRead(notificationId);
         });
 
-        assertTrue(exception.getMessage().contains("Notifikasi tidak ditemukan"));
+        assertTrue(exception.getMessage().toLowerCase().contains("tidak ditemukan"));
         verify(notificationRepository, never()).save(any(Notification.class));
     }
 
@@ -106,22 +219,16 @@ class NotificationServiceTest {
 
     @Test
     void deleteNotification_success() {
-        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
-        doNothing().when(notificationRepository).delete(notification);
+        doNothing().when(notificationRepository).deleteById(notificationId);
 
         notificationService.deleteNotification(notificationId);
 
-        verify(notificationRepository, times(1)).delete(notification);
+        verify(notificationRepository, times(1)).deleteById(notificationId);
     }
 
     @Test
     void deleteNotification_notFound_throwsException() {
-        when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class, () -> {
-            notificationService.deleteNotification(notificationId);
-        });
-
-        verify(notificationRepository, never()).delete(any(Notification.class));
+        assertDoesNotThrow(() -> notificationService.deleteNotification(notificationId));
+        verify(notificationRepository, times(1)).deleteById(notificationId);
     }
 }

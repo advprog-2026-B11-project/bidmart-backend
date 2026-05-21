@@ -123,14 +123,15 @@ public class BidService {
                         new OutbidEvent(savedBid.getListingId(), outbid.getBuyerId(), savedBid.getAmount())));
 
         eventPublisher.publishEvent(new BidPlacedEvent(
-                savedBid.getListingId(),
-                savedBid.getBuyerId(),
-                savedBid.getAmount()
+            savedBid.getId(),
+            savedBid.getListingId(),
+            savedBid.getBuyerId(),
+            savedBid.getAmount()
         ));
 
         if (extended) {
             eventPublisher.publishEvent(new AuctionExtendedEvent(
-                    listingEntity.getId(), listingEntity.getEndTime()));
+                listingEntity.getId(), listingEntity.getSellerId()));
         }
 
         return BidResponse.from(savedBid);

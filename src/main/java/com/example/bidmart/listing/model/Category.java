@@ -5,6 +5,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Id;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Column;
+import jakarta.persistence.Index;
 
 import java.util.UUID;
 
@@ -19,7 +20,10 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 
 @Entity
-@Table(name = "categories")
+@Table(name = "categories", indexes = {
+        @Index(name = "idx_category_name", columnList = "name"),
+        @Index(name = "idx_category_parent_id", columnList = "parent_id")
+})
 public class Category {
 
     @Id

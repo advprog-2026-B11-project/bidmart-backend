@@ -1,6 +1,5 @@
 package com.example.bidmart.listing.service;
 
-import com.example.bidmart.bidding.service.ListingSnapshot;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
@@ -11,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Service
 public class ListingService {
@@ -62,26 +62,13 @@ public class ListingService {
         existing.setStartingPrice(updatedListing.getStartingPrice());
         existing.setReservePrice(updatedListing.getReservePrice());
         existing.setEndTime(updatedListing.getEndTime());
-        if (updatedListing.getStatus() != null) {
-            existing.setStatus(updatedListing.getStatus());
-        }
-
         return listingRepository.save(existing);
     }
 
     private void validateListingForUpdate(Listing listing) {
-        ListingSnapshot snapshot = new ListingSnapshot(
-                listing.getId(),
-                listing.getSellerId(),
-                listing.getStartingPrice(),
-                listing.getEndTime(),
-                listing.getStatus(),
-                listing.getCurrentHighestBid(),
-                listing.getCurrentHighestBidderId()
-        );
-
-        if (snapshot.isOpenAt(LocalDateTime.now())) {
-            throw new RuntimeException("Listing tidak bisa diupdate saat auction masih aktif.");
+        if (listing.getStatus() != null && listing.getStatus().isActive()) {
+            throw new RuntimeException(
+                    "Listing tidak bisa diupdate saat auction masih aktif.");
         }
     }
 
@@ -92,5 +79,21 @@ public class ListingService {
         validateListingForUpdate(existing);
 
         listingRepository.delete(existing);
+    }
+
+    public List<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice) {
+        UUID categoryId = null;
+        if (category != null && !category.isEmpty()) {
+            try {
+                categoryId = UUID.fromString(category);
+            } catch (IllegalArgumentException e) {
+                // Invalid UUID, ignore category filter
+            }
+        }
+        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
+    }
+
+    public List<Listing> getActiveListings() {
+        return listingRepository.findActiveListings();
     }
 }

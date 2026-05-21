@@ -47,6 +47,7 @@ public class AuctionClosingService {
             eventPublisher.publishEvent(new AuctionWonEvent(
                     listing.getId(),
                     listing.getCurrentHighestBidderId(),
+                    listing.getSellerId(),
                     listing.getCurrentHighestBid()
             ));
 
@@ -56,10 +57,10 @@ public class AuctionClosingService {
 
             releaseAllHolds(listing);
 
-            eventPublisher.publishEvent(new AuctionClosedNoWinnerEvent(
+                eventPublisher.publishEvent(new AuctionClosedNoWinnerEvent(
                     listing.getId(),
-                    listing.getCurrentHighestBid() == null ? "Tidak ada bid" : "Reserve price tidak tercapai"
-            ));
+                    listing.getSellerId()
+                ));
         }
     }
 
