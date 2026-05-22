@@ -115,7 +115,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/me/mfa")
+    @GetMapping("/me/mfa/status")
     public ResponseEntity<Map<String, Boolean>> getMyMfaStatus(Authentication authentication) {
         String identifier = authentication.getName();
 
