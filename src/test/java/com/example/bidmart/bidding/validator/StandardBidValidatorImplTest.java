@@ -75,6 +75,18 @@ class StandardBidValidatorImplTest {
     }
 
     @Test
+    void validateRequest_nullAmount_throwsException() {
+        CreateBidRequest request = new CreateBidRequest(listingId, null, false, null);
+        assertThrows(BidValidationException.class, () -> validator.validateRequest(request, buyerId));
+    }
+
+    @Test
+    void validateRequest_negativeAmount_throwsException() {
+        CreateBidRequest request = new CreateBidRequest(listingId, BigDecimal.valueOf(-10), false, null);
+        assertThrows(BidValidationException.class, () -> validator.validateRequest(request, buyerId));
+    }
+
+    @Test
     void validateRequest_validProxyBid() {
         CreateBidRequest request = new CreateBidRequest(listingId, BigDecimal.valueOf(100), true, BigDecimal.valueOf(500));
         assertDoesNotThrow(() -> validator.validateRequest(request, buyerId));
@@ -83,6 +95,18 @@ class StandardBidValidatorImplTest {
     @Test
     void validateRequest_proxyBidWithoutMaxLimit_throwsException() {
         CreateBidRequest request = new CreateBidRequest(listingId, BigDecimal.valueOf(100), true, null);
+        assertThrows(BidValidationException.class, () -> validator.validateRequest(request, buyerId));
+    }
+
+    @Test
+    void validateRequest_proxyBidWithZeroMaxLimit_throwsException() {
+        CreateBidRequest request = new CreateBidRequest(listingId, BigDecimal.valueOf(100), true, BigDecimal.ZERO);
+        assertThrows(BidValidationException.class, () -> validator.validateRequest(request, buyerId));
+    }
+
+    @Test
+    void validateRequest_proxyBidWithNegativeMaxLimit_throwsException() {
+        CreateBidRequest request = new CreateBidRequest(listingId, BigDecimal.valueOf(100), true, BigDecimal.valueOf(-50));
         assertThrows(BidValidationException.class, () -> validator.validateRequest(request, buyerId));
     }
 
@@ -109,6 +133,20 @@ class StandardBidValidatorImplTest {
                 null
         );
         assertThrows(BidValidationException.class, () -> validator.validateBidContext(buyerId, listingWhereBuyerIsSeller, BigDecimal.valueOf(250), Optional.of(currentHighestBid)));
+    }
+
+    @Test
+    void validateBidContext_nullSellerId_doesNotThrow() {
+        ListingSnapshot nullSellerListing = new ListingSnapshot(
+                listingId,
+                null,
+                BigDecimal.valueOf(100),
+                LocalDateTime.now().plusDays(1),
+                AuctionStatus.ACTIVE,
+                null,
+                null
+        );
+        assertDoesNotThrow(() -> validator.validateBidContext(buyerId, nullSellerListing, BigDecimal.valueOf(250), Optional.empty()));
     }
 
     @Test
@@ -140,6 +178,20 @@ class StandardBidValidatorImplTest {
     }
 
     @Test
+    void validateBidContext_nullEndTime_doesNotThrow() {
+        ListingSnapshot noEndTimeListing = new ListingSnapshot(
+                listingId,
+                UUID.randomUUID(),
+                BigDecimal.valueOf(100),
+                null,
+                AuctionStatus.ACTIVE,
+                null,
+                null
+        );
+        assertDoesNotThrow(() -> validator.validateBidContext(buyerId, noEndTimeListing, BigDecimal.valueOf(250), Optional.empty()));
+    }
+
+    @Test
     void validateBidContext_bidTooLowWithHighestBid_throwsException() {
         assertThrows(BidTooLowException.class, () -> validator.validateBidContext(buyerId, activeListing, BigDecimal.valueOf(150), Optional.of(currentHighestBid)));
     }
@@ -147,5 +199,29 @@ class StandardBidValidatorImplTest {
     @Test
     void validateBidContext_bidTooLowWithoutHighestBid_throwsException() {
         assertThrows(BidTooLowException.class, () -> validator.validateBidContext(buyerId, activeListing, BigDecimal.valueOf(50), Optional.empty()));
+    }
+
+    @Test
+    void validateBidContext_bidEqualToHighestBid_throwsException() {
+        assertThrows(BidTooLowException.class, () -> validator.validateBidContext(buyerId, activeListing, BigDecimal.valueOf(200), Optional.of(currentHighestBid)));
+    }
+
+    @Test
+    void validateBidContext_nullStartingPrice_defaultsToZero() {
+        ListingSnapshot nullStartingPriceListing = new ListingSnapshot(
+                listingId,
+                UUID.randomUUID(),
+                null,
+                LocalDateTime.now().plusDays(1),
+                AuctionStatus.ACTIVE,
+                null,
+                null
+        );
+        assertDoesNotThrow(() -> validator.validateBidContext(buyerId, nullStartingPriceListing, BigDecimal.valueOf(10), Optional.empty()));
+    }
+
+    @Test
+    void validateBidContext_noHighestBid_bidEqualToStartingPrice_success() {
+        assertDoesNotThrow(() -> validator.validateBidContext(buyerId, activeListing, BigDecimal.valueOf(100), Optional.empty()));
     }
 }

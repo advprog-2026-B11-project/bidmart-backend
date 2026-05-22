@@ -148,6 +148,15 @@ class OrderServiceTest {
     }
 
     @Test
+    void updateTrackingNumber_invalidTransition_throwsException() {
+        order.setStatus(OrderStatus.DELIVERED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        assertThrows(InvalidOrderStatusTransitionException.class, () -> {
+            orderService.updateTrackingNumber(orderId, sellerId, "RESI123");
+        });
+    }
+
+    @Test
     void confirmDelivery_success() {
         order.setStatus(OrderStatus.SHIPPED);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -167,6 +176,15 @@ class OrderServiceTest {
     }
 
     @Test
+    void confirmDelivery_wrongUser_throwsException() {
+        order.setStatus(OrderStatus.SHIPPED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        assertThrows(IllegalArgumentException.class, () -> {
+            orderService.confirmDelivery(orderId, sellerId);
+        });
+    }
+
+    @Test
     void disputeOrder_success() {
         order.setStatus(OrderStatus.SHIPPED);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -175,6 +193,24 @@ class OrderServiceTest {
         Order result = orderService.disputeOrder(orderId, buyerId, "Barang rusak");
         assertEquals(OrderStatus.DISPUTED, result.getStatus());
         assertEquals("Barang rusak", result.getDisputeReason());
+    }
+
+    @Test
+    void disputeOrder_wrongUser_throwsException() {
+        order.setStatus(OrderStatus.SHIPPED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        assertThrows(IllegalArgumentException.class, () -> {
+            orderService.disputeOrder(orderId, sellerId, "Barang rusak");
+        });
+    }
+
+    @Test
+    void disputeOrder_invalidTransition_throwsException() {
+        order.setStatus(OrderStatus.CREATED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        assertThrows(InvalidOrderStatusTransitionException.class, () -> {
+            orderService.disputeOrder(orderId, buyerId, "Barang rusak");
+        });
     }
 
     @Test
@@ -212,6 +248,16 @@ class OrderServiceTest {
     }
 
     @Test
+    void resolveDispute_invalidTransitionForSeller_throwsException() {
+        order.setStatus(OrderStatus.CREATED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThrows(InvalidOrderStatusTransitionException.class, () -> {
+            orderService.resolveDispute(orderId, false);
+        });
+    }
+
+    @Test
     void deleteOrder_success() {
         when(orderRepository.existsById(orderId)).thenReturn(true);
         doNothing().when(orderRepository).deleteById(orderId);
@@ -219,6 +265,26 @@ class OrderServiceTest {
         orderService.deleteOrder(orderId);
         
         verify(orderRepository, times(1)).deleteById(orderId);
+    }
+    
+    @Test
+    void deleteOrder_notFound_throwsException() {
+        when(orderRepository.existsById(orderId)).thenReturn(false);
+        assertThrows(OrderNotFoundException.class, () -> {
+            orderService.deleteOrder(orderId);
+        });
+    }
+
+    @Test
+    void updateOrderStatus_toShipped_doesNotPublishWalletEvent() {
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        Order result = orderService.updateOrderStatus(orderId, "SHIPPED");
+
+        assertEquals(OrderStatus.SHIPPED, result.getStatus());
+        verify(eventPublisher, never()).publishEvent(any(OrderDeliveredEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(OrderRefundedEvent.class));
     }
     
     @Test

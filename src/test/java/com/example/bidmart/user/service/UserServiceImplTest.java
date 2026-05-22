@@ -69,6 +69,12 @@ class UserServiceImplTest {
     }
 
     @Test
+    void getCurrentUser_userNotFound_throwsException() {
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userService.getCurrentUser("unknown"));
+    }
+
+    @Test
     void updateProfile_updatesFieldsAndReturnsProfile() {
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenReturn(user);
@@ -85,6 +91,42 @@ class UserServiceImplTest {
     }
 
     @Test
+    void updateProfile_nullDisplayNameAndPhoneNumber_doesNotUpdateFields() {
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setDisplayName(null);
+        request.setPhoneNumber(null);
+
+        UserProfileResponse response = userService.updateProfile(username, request);
+        assertNotNull(response);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateProfile_blankDisplayNameAndPhoneNumber_doesNotUpdateFields() {
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setDisplayName("   ");
+        request.setPhoneNumber("   ");
+
+        UserProfileResponse response = userService.updateProfile(username, request);
+        assertNotNull(response);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateProfile_userNotFound_throwsException() {
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        assertThrows(IllegalArgumentException.class, () -> userService.updateProfile("unknown", request));
+    }
+
+    @Test
     void deactivateUser_deactivatesAndPublishesEvent() {
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
@@ -94,6 +136,12 @@ class UserServiceImplTest {
         verify(userRepository).save(user);
         verify(sessionRepository).deleteAllByUserId(userId);
         verify(eventPublisher).publishEvent(any(UserDeactivatedEvent.class));
+    }
+
+    @Test
+    void deactivateUser_userNotFound_throwsException() {
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userService.deactivateUser(userId));
     }
 
     @Test
@@ -134,6 +182,12 @@ class UserServiceImplTest {
     }
 
     @Test
+    void changeUserRole_userNotFound_throwsException() {
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userService.changeUserRole(userId, roleSeller));
+    }
+
+    @Test
     void deleteProfile_deletesUserAndSessions() {
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
 
@@ -144,11 +198,23 @@ class UserServiceImplTest {
     }
 
     @Test
+    void deleteProfile_userNotFound_throwsException() {
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userService.deleteProfile("unknown"));
+    }
+
+    @Test
     void getUserIdByUsername_returnsId() {
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
 
         UUID result = userService.getUserIdByUsername(username);
 
         assertEquals(userId, result);
+    }
+
+    @Test
+    void getUserIdByUsername_userNotFound_throwsException() {
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> userService.getUserIdByUsername("unknown"));
     }
 }
