@@ -206,15 +206,8 @@ class NotificationServiceTest {
 
     @Test
     void markAllAsRead_success() {
-        Notification notif2 = new Notification(userId, "TYPE_2", "Message 2");
-        List<Notification> unreadList = Arrays.asList(notification, notif2);
-        when(notificationRepository.findByUserIdAndIsReadFalse(userId)).thenReturn(unreadList);
-
         notificationService.markAllAsRead(userId);
-
-        assertTrue(notification.isRead());
-        assertTrue(notif2.isRead());
-        verify(notificationRepository, times(1)).saveAll(unreadList);
+        verify(notificationRepository, times(1)).markAllAsReadByUserId(userId);
     }
 
     @Test
