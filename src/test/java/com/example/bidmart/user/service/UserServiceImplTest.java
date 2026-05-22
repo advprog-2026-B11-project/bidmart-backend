@@ -43,9 +43,9 @@ class UserServiceImplTest {
 
     @InjectMocks
     private UserServiceImpl userService;
+    
     private User user;
-    private final String username = "testuser";
-    private final UUID userId = UUID.randomUUID();
+    private final String username = "alice";
 
     private Role roleBuyer;
     private Role roleSeller;
@@ -63,7 +63,7 @@ class UserServiceImplTest {
         user.setPhoneNumber("08123456789");
         user.setImageUrl("https://img.example.com/alice.png");
         user.setShippingAddress("Jl. Sudirman No. 1, Jakarta");
-        user.setRole(mockRole);
+        user.setRole(roleBuyer);
         user.setEmailVerified(false);
         user.setActive(true);
 
@@ -86,10 +86,11 @@ class UserServiceImplTest {
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setDisplayName("Alice Updated");
         request.setImageUrl("https://img.example.com/alice-new.png");
+        request.setPhoneNumber("123456");
 
         UserProfileResponse response = userService.updateProfile(username, request);
 
-        assertEquals("New Name", response.getDisplayName());
+        assertEquals("Alice Updated", response.getDisplayName());
         assertEquals("123456", response.getPhoneNumber());
         verify(userRepository).save(user);
     }
@@ -103,9 +104,11 @@ class UserServiceImplTest {
         request.setDisplayName(null);
         request.setPhoneNumber(null);
 
-        assertEquals("Alice Updated", response.getDisplayName());
+        UserProfileResponse response = userService.updateProfile(username, request);
+
+        assertEquals("Alice", response.getDisplayName());
         assertEquals("08123456789", response.getPhoneNumber());
-        assertEquals("https://img.example.com/alice-new.png", response.getImageUrl());
+        assertEquals("https://img.example.com/alice.png", response.getImageUrl());
         verify(userRepository, times(1)).save(user);
     }
 
@@ -129,8 +132,7 @@ class UserServiceImplTest {
 
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setDisplayName("Alice Updated");
-        when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
-        assertThrows(IllegalArgumentException.class, () -> userService.updateProfile("alice", request));
+        assertThrows(IllegalArgumentException.class, () -> userService.updateProfile("unknown", request));
     }
 
     @Test
@@ -138,7 +140,8 @@ class UserServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         userService.deleteProfile("alice");
 
-        verify(userRepository, never()).save(any());
+        verify(sessionRepository).deleteAllByUserId(user.getId());
+        verify(userRepository).delete(user);
         verify(eventPublisher, never()).publishEvent(any());
     }
 
@@ -241,7 +244,7 @@ class UserServiceImplTest {
 
         assertFalse(response.isEnabled());
         assertFalse(user.isMfaEnabled());
-        assertNull(user.getMfaEmailCode()); // Pastikan email code dihapus
+        assertNull(user.getMfaEmailCode()); 
         verify(userRepository, times(1)).save(user);
     }
 

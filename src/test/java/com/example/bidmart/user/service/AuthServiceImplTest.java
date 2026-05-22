@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.HashSet;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,6 +54,7 @@ class AuthServiceImplTest {
     private RoleRepository roleRepository;
     @Mock
     private EmailService emailService;
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
@@ -63,16 +65,17 @@ class AuthServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        mockRole = new Role(UUID.randomUUID(), "USER", new HashSet<>());
+        role = new Role(UUID.randomUUID(), "USER", new HashSet<>());
 
-        mockUser = new User();
-        mockUser.setId(UUID.randomUUID());
-        mockUser.setUsername("testuser");
-        mockUser.setEmail("test@mail.com");
-        mockUser.setPassword("encoded-password");
-        mockUser.setRole(mockRole);
-        mockUser.setDisplayName("Test User");
-        mockUser.setEmailVerified(true);
+        user = new User();
+        user.setId(UUID.randomUUID());
+        user.setUsername("testuser");
+        user.setEmail("test@mail.com");
+        user.setPassword("encoded-password");
+        user.setRole(role);
+        user.setDisplayName("Test User");
+        user.setEmailVerified(true);
+        user.setActive(true);
 
         authService = new AuthServiceImpl(
                 userRepository,
@@ -81,11 +84,11 @@ class AuthServiceImplTest {
                 jwtService,
                 sessionService,
                 mfaService,
-            roleRepository,
-            emailService,
-            "http://localhost:8080/api/auth/verify?token={token}",
-            300L,
-            3
+                roleRepository,
+                emailService,
+                "http://localhost:8080/api/auth/verify?token={token}",
+                300L,
+                3
         );
     }
 
@@ -101,14 +104,19 @@ class AuthServiceImplTest {
         when(userRepository.existsByEmail("new@new.com")).thenReturn(false);
         when(roleRepository.findByName("USER")).thenReturn(Optional.of(role));
         when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        User savedUser = new User();
+        savedUser.setUsername("newuser");
+        savedUser.setEmail("new@new.com");
+        savedUser.setRole(role);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
         AuthResponse response = authService.register(request);
 
         assertNotNull(response);
         assertEquals("newuser", response.getUsername());
         verify(userRepository, times(1)).save(any(User.class));
-        verify(emailService, times(1)).sendVerificationEmail(eq("new@mail.com"), anyString());
+        verify(emailService, times(1)).sendVerificationEmail(eq("new@new.com"), anyString());
     }
 
     @Test
@@ -143,23 +151,23 @@ class AuthServiceImplTest {
 
     @Test
     void resendVerification_shouldRotateTokenAndSendEmail() {
-        mockUser.setEmailVerified(false);
-        mockUser.setVerificationToken("old-token");
+        user.setEmailVerified(false);
+        user.setVerificationToken("old-token");
 
-        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
 
         authService.resendVerification("test@mail.com");
 
-        assertNotNull(mockUser.getVerificationToken());
-        verify(userRepository, times(1)).save(mockUser);
+        assertNotNull(user.getVerificationToken());
+        verify(userRepository, times(1)).save(user);
         verify(emailService, times(1)).sendVerificationEmail(eq("test@mail.com"), anyString());
     }
 
     @Test
     void resendVerification_shouldThrowWhenAlreadyVerified() {
-        mockUser.setEmailVerified(true);
+        user.setEmailVerified(true);
 
-        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
 
         assertThrows(IllegalArgumentException.class, () -> authService.resendVerification("test@mail.com"));
         verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
@@ -199,7 +207,11 @@ class AuthServiceImplTest {
         when(userRepository.existsByEmail("new@new.com")).thenReturn(false);
         when(roleRepository.findByName("USER")).thenReturn(Optional.of(role));
         when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        User savedUser = new User();
+        savedUser.setUsername("newuser");
+        savedUser.setRole(role);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
         AuthResponse response = authService.register(request);
         assertNotNull(response);
@@ -217,7 +229,11 @@ class AuthServiceImplTest {
         when(userRepository.existsByEmail("new@new.com")).thenReturn(false);
         when(roleRepository.findByName("USER")).thenReturn(Optional.of(role));
         when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        User savedUser = new User();
+        savedUser.setUsername("newuser");
+        savedUser.setRole(role);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
         AuthResponse response = authService.register(request);
         assertNotNull(response);
@@ -236,7 +252,11 @@ class AuthServiceImplTest {
         when(userRepository.existsByEmail("new@new.com")).thenReturn(false);
         when(roleRepository.findByName("SELLER")).thenReturn(Optional.of(sellerRole));
         when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        User savedUser = new User();
+        savedUser.setUsername("newuser");
+        savedUser.setRole(sellerRole);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
         AuthResponse response = authService.register(request);
         assertNotNull(response);
@@ -275,13 +295,11 @@ class AuthServiceImplTest {
         LoginRequest request = new LoginRequest();
         request.setIdentifier("testuser");
         request.setPassword("password123");
-        mockUser.setEmailVerified(true);
-        mockUser.setMfaEnabled(false);
 
         when(userRepository.findByEmail("testuser")).thenReturn(Optional.empty());
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password123", "encoded-password")).thenReturn(true);
-        when(jwtService.generateRefreshToken(mockUser)).thenReturn("refresh-token");
+        when(jwtService.generateRefreshToken(user)).thenReturn("refreshToken");
         UUID sessionId = UUID.randomUUID();
         SessionResponse sessionResponse = SessionResponse.builder()
             .id(sessionId)
@@ -289,8 +307,8 @@ class AuthServiceImplTest {
             .createdAt(Instant.now())
             .expiresAt(Instant.now().plusSeconds(3600))
             .build();
-        when(sessionService.createSession(mockUser, "refresh-token", "Test Device")).thenReturn(sessionResponse);
-        when(jwtService.generateAccessToken(mockUser, sessionId)).thenReturn("access-token");
+        when(sessionService.createSession(user, "refreshToken", "deviceInfo")).thenReturn(sessionResponse);
+        when(jwtService.generateAccessToken(user, sessionId)).thenReturn("accessToken");
 
         AuthResponse response = authService.login(request, "deviceInfo");
 
@@ -305,15 +323,18 @@ class AuthServiceImplTest {
         LoginRequest request = new LoginRequest();
         request.setIdentifier("testuser");
         request.setPassword("password123");
-        mockUser.setEmailVerified(true);
-        mockUser.setMfaEnabled(true);
-        mockUser.setMfaMethod(MfaMethod.TOTP);
+        user.setMfaMethod(MfaMethod.TOTP);
 
         when(userRepository.findByEmail("testuser")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
-        when(jwtService.generateAccessToken(user)).thenReturn("accessToken");
+        when(passwordEncoder.matches("password123", "encoded-password")).thenReturn(true);
+        
+        UUID sessionId = UUID.randomUUID();
+        SessionResponse sessionResponse = SessionResponse.builder().id(sessionId).deviceInfo("Unknown-Device").build();
+        
         when(jwtService.generateRefreshToken(user)).thenReturn("refreshToken");
+        when(sessionService.createSession(user, "refreshToken", "Unknown-Device")).thenReturn(sessionResponse);
+        when(jwtService.generateAccessToken(user, sessionId)).thenReturn("accessToken");
 
         AuthResponse response = authService.login(request, null);
 
@@ -324,13 +345,18 @@ class AuthServiceImplTest {
     @Test
     void login_blankDeviceInfo_defaultsToUnknown() {
         LoginRequest request = new LoginRequest();
-        request.setIdentifier("test@test.com");
-        request.setPassword("password");
+        request.setIdentifier("test@mail.com");
+        request.setPassword("password123");
 
-        when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
-        when(jwtService.generateAccessToken(user)).thenReturn("accessToken");
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password123", "encoded-password")).thenReturn(true);
+        
+        UUID sessionId = UUID.randomUUID();
+        SessionResponse sessionResponse = SessionResponse.builder().id(sessionId).deviceInfo("Unknown-Device").build();
+        
         when(jwtService.generateRefreshToken(user)).thenReturn("refreshToken");
+        when(sessionService.createSession(user, "refreshToken", "Unknown-Device")).thenReturn(sessionResponse);
+        when(jwtService.generateAccessToken(user, sessionId)).thenReturn("accessToken");
 
         AuthResponse response = authService.login(request, "   ");
 
@@ -353,21 +379,20 @@ class AuthServiceImplTest {
         LoginRequest request = new LoginRequest();
         request.setIdentifier("testuser");
         request.setPassword("password123");
-        mockUser.setEmailVerified(true);
-        mockUser.setMfaEnabled(true);
-        mockUser.setMfaMethod(MfaMethod.EMAIL);
+        user.setMfaEnabled(true);
+        user.setMfaMethod(MfaMethod.EMAIL);
 
         when(userRepository.findByEmail("testuser")).thenReturn(Optional.empty());
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password123", "encoded-password")).thenReturn(true);
-        when(jwtService.generateTempToken(mockUser)).thenReturn("temp-token");
+        when(jwtService.generateTempToken(user)).thenReturn("temp-token");
 
         AuthResponse response = authService.login(request, "Test Device");
 
         assertTrue(response.isMfaRequired());
         assertEquals("temp-token", response.getTempToken());
-        assertNotNull(mockUser.getMfaEmailCode());
-        assertNotNull(mockUser.getMfaEmailCodeExpiresAt());
+        assertNotNull(user.getMfaEmailCode());
+        assertNotNull(user.getMfaEmailCodeExpiresAt());
         verify(emailService, times(1)).sendMfaCodeEmail(eq("test@mail.com"), anyString());
     }
 
@@ -376,17 +401,12 @@ class AuthServiceImplTest {
         LoginRequest request = new LoginRequest();
         request.setIdentifier("testuser");
         request.setPassword("wrong-password");
-        mockUser.setEmailVerified(true);
 
         when(userRepository.findByEmail("testuser")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
-        when(jwtService.generateTempToken(user)).thenReturn("tempToken");
+        when(passwordEncoder.matches("wrong-password", "encoded-password")).thenReturn(false);
 
-        AuthResponse response = authService.login(request, "deviceInfo");
-
-        assertTrue(response.isMfaRequired());
-        assertEquals("tempToken", response.getTempToken());
+        assertThrows(IllegalArgumentException.class, () -> authService.login(request, "deviceInfo"));
     }
 
     @Test
@@ -400,7 +420,12 @@ class AuthServiceImplTest {
         when(jwtService.extractUsername("tempToken")).thenReturn("testuser");
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(mfaService.verifyCode("secret", "123456")).thenReturn(true);
-        when(jwtService.generateAccessToken(user)).thenReturn("accessToken");
+        
+        UUID sessionId = UUID.randomUUID();
+        SessionResponse sessionResponse = SessionResponse.builder().id(sessionId).deviceInfo("Default Device").build();
+        when(jwtService.generateRefreshToken(user)).thenReturn("refreshToken");
+        when(sessionService.createSession(user, "refreshToken", "Default Device")).thenReturn(sessionResponse);
+        when(jwtService.generateAccessToken(user, sessionId)).thenReturn("accessToken");
 
         AuthResponse response = authService.verifyMfaLogin(request);
 
@@ -472,8 +497,8 @@ class AuthServiceImplTest {
                 .deviceInfo("device")
                 .build();
 
-        when(sessionRepository.findByRefreshToken(oldRefreshToken)).thenReturn(Optional.of(session));
-        when(jwtService.generateRefreshToken(mockUser)).thenReturn("new-refresh-token");
+        when(sessionRepository.findByRefreshToken("oldToken")).thenReturn(Optional.of(session));
+        when(jwtService.generateRefreshToken(user)).thenReturn("new-refresh-token");
         UUID newSessionId = UUID.randomUUID();
         SessionResponse newSession = SessionResponse.builder()
             .id(newSessionId)
@@ -481,13 +506,13 @@ class AuthServiceImplTest {
             .createdAt(Instant.now())
             .expiresAt(Instant.now().plusSeconds(3600))
             .build();
-        when(sessionService.createSession(mockUser, "new-refresh-token", "Test Device")).thenReturn(newSession);
-        when(jwtService.generateAccessToken(mockUser, newSessionId)).thenReturn("new-access-token");
+        when(sessionService.createSession(user, "new-refresh-token", "device")).thenReturn(newSession);
+        when(jwtService.generateAccessToken(user, newSessionId)).thenReturn("new-access-token");
 
         AuthResponse response = authService.refreshToken("oldToken");
 
         assertNotNull(response);
-        assertEquals("newAccess", response.getAccessToken());
+        assertEquals("new-access-token", response.getAccessToken());
         assertTrue(session.isRevoked());
         verify(sessionRepository).save(session);
     }
@@ -520,25 +545,26 @@ class AuthServiceImplTest {
 
         assertThrows(IllegalArgumentException.class, () -> authService.refreshToken("expired"));
     }
+    
     @Test
     void verifyMfaLogin_totp_shouldSucceed() {
         MfaVerificationRequest request = new MfaVerificationRequest();
         request.setTempToken("temp-token");
         request.setCode("123456");
 
-        mockUser.setMfaEnabled(true);
-        mockUser.setMfaSecret("SECRET");
-        mockUser.setMfaMethod(MfaMethod.TOTP);
+        user.setMfaEnabled(true);
+        user.setMfaSecret("SECRET");
+        user.setMfaMethod(MfaMethod.TOTP);
 
         when(jwtService.extractUsername("temp-token")).thenReturn("testuser");
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(mfaService.verifyCode("SECRET", "123456")).thenReturn(true);
         
         UUID sessionId = UUID.randomUUID();
         SessionResponse sessionResponse = SessionResponse.builder().id(sessionId).deviceInfo("Dev").build();
-        when(jwtService.generateRefreshToken(mockUser)).thenReturn("refresh-token");
-        when(sessionService.createSession(eq(mockUser), eq("refresh-token"), anyString())).thenReturn(sessionResponse);
-        when(jwtService.generateAccessToken(mockUser, sessionId)).thenReturn("access-token");
+        when(jwtService.generateRefreshToken(user)).thenReturn("refresh-token");
+        when(sessionService.createSession(eq(user), eq("refresh-token"), anyString())).thenReturn(sessionResponse);
+        when(jwtService.generateAccessToken(user, sessionId)).thenReturn("access-token");
 
         AuthResponse response = authService.verifyMfaLogin(request);
 
@@ -553,24 +579,24 @@ class AuthServiceImplTest {
         request.setTempToken("temp-token");
         request.setCode("123456");
 
-        mockUser.setMfaEnabled(true);
-        mockUser.setMfaMethod(MfaMethod.EMAIL);
-        mockUser.setMfaEmailCode("123456");
-        mockUser.setMfaEmailCodeExpiresAt(Instant.now().plusSeconds(300));
+        user.setMfaEnabled(true);
+        user.setMfaMethod(MfaMethod.EMAIL);
+        user.setMfaEmailCode("123456");
+        user.setMfaEmailCodeExpiresAt(Instant.now().plusSeconds(300));
 
         when(jwtService.extractUsername("temp-token")).thenReturn("testuser");
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         
         UUID sessionId = UUID.randomUUID();
         SessionResponse sessionResponse = SessionResponse.builder().id(sessionId).build();
-        when(jwtService.generateRefreshToken(mockUser)).thenReturn("refresh-token");
+        when(jwtService.generateRefreshToken(user)).thenReturn("refresh-token");
         when(sessionService.createSession(any(), any(), any())).thenReturn(sessionResponse);
-        when(jwtService.generateAccessToken(mockUser, sessionId)).thenReturn("access-token");
+        when(jwtService.generateAccessToken(user, sessionId)).thenReturn("access-token");
 
         AuthResponse response = authService.verifyMfaLogin(request);
 
         assertNotNull(response);
-        assertNull(mockUser.getMfaEmailCode()); // Memastikan kode email dibersihkan setelah dipakai
-        assertNull(mockUser.getMfaEmailCodeExpiresAt());
+        assertNull(user.getMfaEmailCode()); 
+        assertNull(user.getMfaEmailCodeExpiresAt());
     }
 }

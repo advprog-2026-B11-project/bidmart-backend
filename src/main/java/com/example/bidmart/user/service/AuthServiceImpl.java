@@ -102,7 +102,6 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         validateNewUser(request.getUsername(), request.getEmail());
-        Role registrationRole = resolveRegistrationRole(request.getRole());
 
         User user = new User();
         user.setUsername(request.getUsername());

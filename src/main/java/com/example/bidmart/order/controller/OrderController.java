@@ -29,7 +29,7 @@ public class OrderController {
 //     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_READ)")
     @PreAuthorize("hasAuthority('order:read') and (#buyerId.toString() == authentication.name or hasAuthority('SCOPE_ADMIN'))")
     public ResponseEntity<List<Order>> getOrdersByBuyer(@PathVariable UUID buyerId) {
-        List<Order> orders = orderService.getOrdersByBuyer(buyerId);
+        List<Order> orders = orderService.getOrdersByUser(buyerId);
         return ResponseEntity.ok(orders);
     }
 
