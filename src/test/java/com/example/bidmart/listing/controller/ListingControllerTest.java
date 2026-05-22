@@ -173,24 +173,39 @@ class ListingControllerTest {
 
     @Test
     void searchListings_shouldReturnListings() {
-        when(listingService.searchListings("test", null, null, null))
-                .thenReturn(List.of(listing));
+        when(listingService.searchListings("test", null, null, null)).thenReturn(List.of(listing));
 
-        ResponseEntity<List<Listing>> response = listingController.searchListings("test", null, null, null);
+        ResponseEntity<?> response = listingController.searchListings("test", null, null, null);
+        Object body = response.getBody();
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().size());
+        assertTrue(body instanceof List<?>);
+        List<?> results = (List<?>) body;
+        assertEquals(1, results.size());
     }
 
     @Test
     void searchListings_shouldReturnEmptyList() {
-        when(listingService.searchListings("nonexistent", null, null, null))
-                .thenReturn(List.of());
+        when(listingService.searchListings("nonexistent", null, null, null)).thenReturn(List.of());
 
-        ResponseEntity<List<Listing>> response = listingController.searchListings("nonexistent", null, null, null);
+        ResponseEntity<?> response = listingController.searchListings("nonexistent", null, null, null);
+        Object body = response.getBody();
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(0, response.getBody().size());
+        assertTrue(body instanceof List<?>);
+        List<?> results = (List<?>) body;
+        assertEquals(0, results.size());
+    }
+
+    @Test
+    void searchListings_shouldReturnBadRequest_whenPriceRangeInvalid() {
+        when(listingService.searchListings(null, null, new BigDecimal("200000"), new BigDecimal("100000")))
+                .thenThrow(new IllegalArgumentException("Minimum price tidak boleh lebih besar dari maximum price."));
+
+        ResponseEntity<?> response = listingController.searchListings(null, null, new BigDecimal("200000"), new BigDecimal("100000"));
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("Minimum price tidak boleh lebih besar dari maximum price.", response.getBody());
     }
 
     @Test
