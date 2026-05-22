@@ -13,12 +13,12 @@ import java.util.List;
 import java.util.UUID;
 
 @SpringBootTest(properties = {
-    "spring.datasource.url=jdbc:h2:mem:testdb",
-    "spring.datasource.driver-class-name=org.h2.Driver",
+    "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false",
+    "spring.datasource.driverClassName=org.h2.Driver",
     "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
     "spring.datasource.username=sa",
-    "spring.datasource.password=",
-    "jwt.secret=testsecretkeythatislongenoughforhmacsha256"
+    "spring.datasource.password=password",
+    "jwt.secret=testingsecretkeywhichislongenoughforhmacsha256algorithm"
 })
 public class NotificationProfilingTest {
 
