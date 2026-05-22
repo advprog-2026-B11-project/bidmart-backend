@@ -25,10 +25,24 @@ public class CategoryController {
         return ResponseEntity.ok(categoryService.getAllCategories());
     }
 
+    @GetMapping("/roots")
+    public ResponseEntity<List<Category>> getRootCategories() {
+        return ResponseEntity.ok(categoryService.getRootCategories());
+    }
+
+    @GetMapping("/{parentId}/children")
+    public ResponseEntity<List<Category>> getChildCategories(@PathVariable UUID parentId) {
+        return ResponseEntity.ok(categoryService.getChildCategories(parentId));
+    }
+
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<Category> createCategory(@RequestBody Category category) {
-        Category created = categoryService.createCategory(category);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<?> createCategory(@RequestBody Category category) {
+        try {
+            Category created = categoryService.createCategory(category);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }

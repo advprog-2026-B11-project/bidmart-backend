@@ -58,6 +58,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/wallet/**").authenticated()
                 
                 .requestMatchers("/api/listings/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                 .requestMatchers("/api/bids/mocks/**").permitAll()
                 .requestMatchers("/api/bids/**").permitAll()
                 .requestMatchers("/api/orders/**").authenticated()

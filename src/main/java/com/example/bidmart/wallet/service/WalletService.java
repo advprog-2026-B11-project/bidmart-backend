@@ -27,6 +27,8 @@ public interface WalletService {
     Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId, String idempotencyKey);
     Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId);
     Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId, String idempotencyKey);
+    void completeOrderPayment(UUID orderId, UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount);
+    void refundOrderPayment(UUID orderId, UUID listingId, UUID buyerId, BigDecimal amount);
     List<Transaction> getTransactionHistory(UUID userId);
     Transaction getTransactionById(UUID transactionId, UUID userId);
 

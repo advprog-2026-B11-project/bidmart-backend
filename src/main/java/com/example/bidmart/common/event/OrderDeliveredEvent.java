@@ -10,6 +10,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class OrderDeliveredEvent {
     private final UUID orderId;
+    private final UUID listingId;
     private final UUID buyerId;
     private final UUID sellerId;
     private final BigDecimal amount;
