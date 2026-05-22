@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 
 import java.util.Arrays;
@@ -69,6 +70,18 @@ class NotificationControllerTest {
         
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
+    }
+
+    @Test
+    void getUserNotifications_nullAuthentication_throwsAccessDenied() {
+        assertThrows(AccessDeniedException.class, () -> notificationController.getUserNotifications(userId, null));
+    }
+
+    @Test
+    void getUserNotifications_differentUser_throwsAccessDenied() {
+        when(authentication.getName()).thenReturn("otheruser");
+        when(userService.getUserIdByUsername("otheruser")).thenReturn(UUID.randomUUID());
+        assertThrows(AccessDeniedException.class, () -> notificationController.getUserNotifications(userId, authentication));
     }
 
     @Test

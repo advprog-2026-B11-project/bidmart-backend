@@ -228,15 +228,8 @@ class NotificationServiceTest {
 
     @Test
     void markAllAsRead_success() {
-        Notification notif2 = new Notification(userId, "TYPE_2", "Message 2");
-        List<Notification> unreadList = Arrays.asList(notification, notif2);
-        when(notificationRepository.findByUserIdAndIsReadFalse(userId)).thenReturn(unreadList);
-
         notificationService.markAllAsRead(userId);
-
-        assertTrue(notification.isRead());
-        assertTrue(notif2.isRead());
-        verify(notificationRepository, times(1)).saveAll(unreadList);
+        verify(notificationRepository, times(1)).markAllAsReadByUserId(userId);
     }
 
     @Test
@@ -247,6 +240,28 @@ class NotificationServiceTest {
         notificationService.deleteNotification(notificationId, userId);
 
         verify(notificationRepository, times(1)).delete(notification);
+    }
+
+    @Test
+    void markAsRead_wrongUser_throwsException() {
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+        
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.markAsRead(notificationId, UUID.randomUUID());
+        });
+        
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void deleteNotification_wrongUser_throwsException() {
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+        
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.deleteNotification(notificationId, UUID.randomUUID());
+        });
+        
+        verify(notificationRepository, never()).delete(any(Notification.class));
     }
 
     @Test
