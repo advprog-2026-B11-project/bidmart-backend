@@ -10,6 +10,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -25,26 +27,40 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
 
     List<Listing> findByStatusInAndEndTimeBefore(List<AuctionStatus> statuses, LocalDateTime time);
     List<Listing> findByStatusIn(Collection<AuctionStatus> statuses);
+    Page<Listing> findByStatusIn(Collection<AuctionStatus> statuses, Pageable pageable);
 
     default List<Listing> findActiveListings() {
         return findByStatusIn(Arrays.asList(AuctionStatus.ACTIVE, AuctionStatus.EXTENDED));
     }
 
+    default Page<Listing> findActiveListings(Pageable pageable) {
+        return findByStatusIn(Arrays.asList(AuctionStatus.ACTIVE, AuctionStatus.EXTENDED), pageable);
+    }
+
     List<Listing> findBySellerIdAndStatusIn(UUID sellerId, List<AuctionStatus> statuses);
 
-    @Query("""
-            SELECT l FROM Listing l
-            WHERE (:keyword IS NULL
-                OR LOWER(l.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                OR LOWER(l.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
-            AND (:category IS NULL OR l.categoryId = :category)
-            AND (:minPrice IS NULL OR l.startingPrice >= :minPrice)
-            AND (:maxPrice IS NULL OR l.startingPrice <= :maxPrice)
-            """)
-    List<Listing> findBySearchCriteria(
-            @Param("keyword") String keyword,
-            @Param("category") UUID category,
-            @Param("minPrice") BigDecimal minPrice,
-            @Param("maxPrice") BigDecimal maxPrice
-    );
+    @Query(value = "SELECT * FROM listings WHERE " +
+            "(CAST(:keyword AS text) IS NULL OR LOWER(title) LIKE LOWER('%' || CAST(:keyword AS text) || '%') OR LOWER(description) LIKE LOWER('%' || CAST(:keyword AS text) || '%')) AND " +
+            "(CAST(:category AS text) IS NULL OR category_id = CAST(:category AS uuid)) AND " +
+            "(CAST(:minPrice AS numeric) IS NULL OR starting_price >= CAST(:minPrice AS numeric)) AND " +
+            "(CAST(:maxPrice AS numeric) IS NULL OR starting_price <= CAST(:maxPrice AS numeric)) " +
+            "ORDER BY created_at DESC",
+            nativeQuery = true)
+    List<Listing> findBySearchCriteria(@Param("keyword") String keyword, @Param("category") UUID category,
+            @Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice);
+
+    @Query(value = "SELECT * FROM listings WHERE " +
+            "(CAST(:keyword AS text) IS NULL OR LOWER(title) LIKE LOWER('%' || CAST(:keyword AS text) || '%') OR LOWER(description) LIKE LOWER('%' || CAST(:keyword AS text) || '%')) AND " +
+            "(CAST(:category AS text) IS NULL OR category_id = CAST(:category AS uuid)) AND " +
+            "(CAST(:minPrice AS numeric) IS NULL OR starting_price >= CAST(:minPrice AS numeric)) AND " +
+            "(CAST(:maxPrice AS numeric) IS NULL OR starting_price <= CAST(:maxPrice AS numeric)) " +
+            "ORDER BY created_at DESC",
+            countQuery = "SELECT count(*) FROM listings WHERE " +
+            "(CAST(:keyword AS text) IS NULL OR LOWER(title) LIKE LOWER('%' || CAST(:keyword AS text) || '%') OR LOWER(description) LIKE LOWER('%' || CAST(:keyword AS text) || '%')) AND " +
+            "(CAST(:category AS text) IS NULL OR category_id = CAST(:category AS uuid)) AND " +
+            "(CAST(:minPrice AS numeric) IS NULL OR starting_price >= CAST(:minPrice AS numeric)) AND " +
+            "(CAST(:maxPrice AS numeric) IS NULL OR starting_price <= CAST(:maxPrice AS numeric))",
+            nativeQuery = true)
+    Page<Listing> findBySearchCriteria(@Param("keyword") String keyword, @Param("category") UUID category,
+            @Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice, Pageable pageable);
 }

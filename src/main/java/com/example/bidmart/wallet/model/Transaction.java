@@ -13,7 +13,9 @@ import java.util.UUID;
 @AllArgsConstructor
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "transactions", indexes = {
+    @Index(name = "idx_tx_wallet_ref", columnList = "wallet_id, reference_id")
+})
 public class Transaction {
 
     @Id

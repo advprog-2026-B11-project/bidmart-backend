@@ -50,21 +50,23 @@ public class WalletController {
     @GetMapping("/{userId}/balance")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Wallet> getBalance(
-            @PathVariable UUID userId,
+            @PathVariable("userId") UUID userId,
             Authentication authentication
     ) {
         ensureCurrentUser(userId, authentication);
         return getBalance(authentication);
     }
 
-    @PostMapping("/{userId}/top-up")
+    @PostMapping({"/{userId}/top-up", "/topup", "/top-up"})
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<WalletResponse> topUp(
-            @PathVariable UUID userId,
+            @PathVariable(name = "userId", required = false) UUID userId,
             @RequestBody TopUpRequest request,
             Authentication authentication
     ) {
-        ensureCurrentUser(userId, authentication);
+        if (userId != null) {
+            ensureCurrentUser(userId, authentication);
+        }
         UUID authenticatedUserId = resolveCurrentUserId(authentication);
         Wallet wallet = walletService.topUp(authenticatedUserId, request);
 
@@ -166,7 +168,7 @@ public class WalletController {
     @GetMapping("/transactions/{transactionId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TransactionResponse> getTransactionDetail(
-            @PathVariable UUID transactionId,
+            @PathVariable("transactionId") UUID transactionId,
             Authentication authentication
     ) {
         UUID userId = resolveCurrentUserId(authentication);

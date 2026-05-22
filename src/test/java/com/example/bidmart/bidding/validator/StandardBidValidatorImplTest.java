@@ -1,6 +1,7 @@
 package com.example.bidmart.bidding.validator;
 
 import com.example.bidmart.bidding.dto.CreateBidRequest;
+import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.model.Bid;
 import com.example.bidmart.bidding.service.ListingSnapshot;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class StandardBidValidatorImplTest {
 
@@ -274,7 +276,7 @@ class StandardBidValidatorImplTest {
         void bidBelowStartingPrice_throws() {
             assertThatThrownBy(() -> validator.validateBidContext(
                     BUYER_ID, openListing(), new BigDecimal("30.00"), Optional.empty()))
-                    .isInstanceOf(BidValidationException.class)
+                    .isInstanceOf(BidTooLowException.class)
                     .hasMessageContaining("lebih besar atau sama dengan starting price");
         }
 
@@ -298,23 +300,45 @@ class StandardBidValidatorImplTest {
         }
 
         @Test
-        void bidEqualsCurrentHighestAmount_throws() {
+        void bidEqualsCurrentHighestAmount_throwsBidTooLow() {
             Bid currentHighest = bidWithAmount(new BigDecimal("100.00"));
 
             assertThatThrownBy(() -> validator.validateBidContext(
                     BUYER_ID, openListing(), new BigDecimal("100.00"), Optional.of(currentHighest)))
-                    .isInstanceOf(BidValidationException.class)
-                    .hasMessageContaining("Bid harus lebih tinggi dari bid tertinggi saat ini.");
+                    .isInstanceOf(BidTooLowException.class)
+                    .hasMessageContaining("Bid harus lebih tinggi dari bid tertinggi saat ini");
         }
 
         @Test
-        void bidBelowCurrentHighestAmount_throws() {
+        void bidBelowCurrentHighestAmount_throwsBidTooLow() {
             Bid currentHighest = bidWithAmount(new BigDecimal("200.00"));
 
             assertThatThrownBy(() -> validator.validateBidContext(
                     BUYER_ID, openListing(), new BigDecimal("150.00"), Optional.of(currentHighest)))
-                    .isInstanceOf(BidValidationException.class)
-                    .hasMessageContaining("Bid harus lebih tinggi dari bid tertinggi saat ini.");
+                    .isInstanceOf(BidTooLowException.class)
+                    .hasMessageContaining("Bid harus lebih tinggi dari bid tertinggi saat ini");
+        }
+
+        @Test
+        void bidTooLow_minimumBidIsHighestPlusOne() {
+            Bid currentHighest = bidWithAmount(new BigDecimal("100.00"));
+
+            BidTooLowException ex = (BidTooLowException) org.junit.jupiter.api.Assertions.assertThrows(
+                    BidTooLowException.class,
+                    () -> validator.validateBidContext(
+                            BUYER_ID, openListing(), new BigDecimal("90.00"), Optional.of(currentHighest)));
+
+            assertEquals(new BigDecimal("101.00"), ex.getMinimumBid());
+        }
+
+        @Test
+        void bidBelowStartingPrice_minimumBidIsStartingPrice() {
+            BidTooLowException ex = (BidTooLowException) org.junit.jupiter.api.Assertions.assertThrows(
+                    BidTooLowException.class,
+                    () -> validator.validateBidContext(
+                            BUYER_ID, openListing(), new BigDecimal("10.00"), Optional.empty()));
+
+            assertEquals(new BigDecimal("50.00"), ex.getMinimumBid());
         }
 
         @Test

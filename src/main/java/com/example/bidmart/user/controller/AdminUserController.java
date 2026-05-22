@@ -20,7 +20,7 @@ public class AdminUserController {
     }
 
     @PutMapping("/{userId}/deactivate")
-    public ResponseEntity<String> deactivateUser(@PathVariable UUID userId) {
+    public ResponseEntity<String> deactivateUser(@PathVariable("userId") UUID userId) {
         userService.deactivateUser(userId);
         return ResponseEntity.ok("The user account has been successfully deactivated and all sessions have been revoked.");
     }

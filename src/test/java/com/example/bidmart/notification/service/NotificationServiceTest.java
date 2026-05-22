@@ -187,7 +187,7 @@ class NotificationServiceTest {
     void markAsRead_success() {
         when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
         when(notificationRepository.save(any(Notification.class))).thenReturn(notification);
-        Notification result = notificationService.markAsRead(notificationId);
+        Notification result = notificationService.markAsRead(notificationId, userId);
         assertTrue(result.isRead());
         verify(notificationRepository, times(1)).save(notification);
     }
@@ -197,7 +197,7 @@ class NotificationServiceTest {
         when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
 
         Exception exception = assertThrows(ResourceNotFoundException.class, () -> {
-            notificationService.markAsRead(notificationId);
+            notificationService.markAsRead(notificationId, userId);
         });
 
         assertTrue(exception.getMessage().toLowerCase().contains("tidak ditemukan"));
@@ -219,16 +219,18 @@ class NotificationServiceTest {
 
     @Test
     void deleteNotification_success() {
-        doNothing().when(notificationRepository).deleteById(notificationId);
+        doNothing().when(notificationRepository).delete(notification);
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
 
-        notificationService.deleteNotification(notificationId);
+        notificationService.deleteNotification(notificationId, userId);
 
-        verify(notificationRepository, times(1)).deleteById(notificationId);
+        verify(notificationRepository, times(1)).delete(notification);
     }
 
     @Test
     void deleteNotification_notFound_throwsException() {
-        assertDoesNotThrow(() -> notificationService.deleteNotification(notificationId));
-        verify(notificationRepository, times(1)).deleteById(notificationId);
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> notificationService.deleteNotification(notificationId, userId));
+        verify(notificationRepository, never()).delete(any(Notification.class));
     }
 }

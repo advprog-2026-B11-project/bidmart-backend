@@ -17,6 +17,10 @@ java {
 	}
 }
 
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs << '-parameters'
+}
+
 repositories {
 	mavenCentral()
 }
@@ -73,14 +77,6 @@ tasks.named('jacocoTestReport') {
         xml.required = true
         html.required = true
     }
-}
-
-tasks.named('jacocoTestReport') {
-	dependsOn test
-	reports {
-		xml.required = true
-		html.required = true
-	}
 }
 
 sonar {
