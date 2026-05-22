@@ -76,7 +76,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "register"]
             },
-            "description": "Register akun seller terpisah untuk testing flow lelang."
+            "description": "Register akun kandidat seller. Secara default backend register membuat role USER, jadi akun ini harus sudah dipromote/di-seed sebagai SELLER sebelum tokennya bisa dipakai untuk create listing."
           }
         },
         {
@@ -130,7 +130,7 @@
                   "    const res = pm.response.json();",
                   "    if (res.accessToken) {",
                   "        pm.collectionVariables.set('sellerToken', res.accessToken);",
-                  "        console.log('✅ Login seller berhasil. Token tersimpan ke {{sellerToken}}.');",
+                  "        console.log('Login seller berhasil. Pastikan akun ini ber-role SELLER. Token tersimpan ke {{sellerToken}}.');",
                   "    }",
                   "}"
                 ]
@@ -149,7 +149,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "login"]
             },
-            "description": "Login sebagai seller. Disimpan ke variable terpisah {{sellerToken}} agar tidak overwrite buyer."
+            "description": "Login memakai akun yang sudah ber-role SELLER. Token disimpan ke {{sellerToken}} agar tidak overwrite buyer token."
           }
         },
         {
@@ -507,6 +507,30 @@
           }
         },
         {
+          "name": "Get Root Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/roots",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "categories", "roots"]
+            },
+            "description": "Public. Ambil kategori root dengan parentId null."
+          }
+        },
+        {
+          "name": "Get Category Children",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{categoryId}}/children",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "categories", "{{categoryId}}", "children"]
+            },
+            "description": "Public. Ambil child category dari parent category tertentu."
+          }
+        },
+        {
           "name": "[Admin] Create Category",
           "request": {
             "method": "POST",
@@ -523,14 +547,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "categories"]
             },
-            "description": "⚠️ ADMIN only. parentId untuk hierarki (null = root category)."
+            "description": "ADMIN only. parentId untuk hierarki (null = root category)."
           }
         }
       ]
     },
     {
       "name": "📦 Listings",
-      "description": "Listing harus dibuat oleh user dengan role SELLER atau ADMIN.",
+      "description": "Listing harus dibuat oleh token akun yang sudah ber-role SELLER atau ADMIN. Register default menghasilkan USER, jadi pastikan {{sellerToken}} berasal dari akun SELLER.",
       "item": [
         {
           "name": "Create Listing (as Seller)",
@@ -540,7 +564,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "if (pm.response.code === 200) {",
                   "    const res = pm.response.json();",
                   "    pm.collectionVariables.set('listingId', res.id);",
                   "    console.log('✅ listingId tersimpan: ' + res.id);",
@@ -605,7 +629,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"title\": \"[TEST] Anti-Sniping Item\",\n  \"description\": \"Listing untuk test anti-sniping, expire 90 detik\",\n  \"startingPrice\": 100000,\n  \"reservePrice\": 50000,\n  \"endTime\": \"{{shortEndTime}}\",\n  \"auctionType\": \"ENGLISH\"\n}"
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"title\": \"[TEST] Anti-Sniping Item\",\n  \"description\": \"Listing untuk test anti-sniping, expire 90 detik\",\n  \"imageUrl\": \"https://example.com/anti-sniping.jpg\",\n  \"startingPrice\": 100000,\n  \"reservePrice\": 150000,\n  \"endTime\": \"{{shortEndTime}}\",\n  \"auctionType\": \"ENGLISH\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/listings",
@@ -679,7 +703,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Laptop Gaming Asus ROG - Updated\",\n  \"description\": \"Deskripsi diperbarui\",\n  \"startingPrice\": 5000000,\n  \"reservePrice\": 9000000,\n  \"endTime\": \"2026-12-15T18:00:00\"\n}"
+              "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"title\": \"Laptop Gaming Asus ROG - Updated\",\n  \"description\": \"Deskripsi diperbarui\",\n  \"imageUrl\": \"https://example.com/laptop-updated.jpg\",\n  \"startingPrice\": 5000000,\n  \"reservePrice\": 9000000,\n  \"endTime\": \"2026-12-15T18:00:00\",\n  \"auctionType\": \"ENGLISH\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/listings/{{listingId}}",

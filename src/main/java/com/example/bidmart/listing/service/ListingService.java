@@ -5,17 +5,17 @@ import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.math.BigDecimal;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ListingService {
@@ -27,6 +27,8 @@ public class ListingService {
     }
 
     public Listing createListing(CreateListingRequest request, UUID sellerId) {
+        validateReservePrice(request.startingPrice(), request.reservePrice());
+
         Listing listing = new Listing();
         listing.setSellerId(sellerId);
         listing.setCategoryId(request.categoryId());
@@ -37,7 +39,7 @@ public class ListingService {
         listing.setReservePrice(request.reservePrice());
         listing.setEndTime(request.endTime());
         listing.setStatus(AuctionStatus.ACTIVE);
-        listing.setAuctionType(AuctionType.ENGLISH);
+        listing.setAuctionType(request.auctionType() == null ? AuctionType.ENGLISH : request.auctionType());
         listing.setCreatedAt(LocalDateTime.now());
         return listingRepository.save(listing);
     }
@@ -64,17 +66,13 @@ public class ListingService {
         return listingRepository.save(listing);
     }
 
-    public Listing updateListing(UUID id, CreateListingRequest request, UUID requesterId) {
+    public Listing updateListing(UUID id, CreateListingRequest request, UUID requesterId, boolean admin) {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
 
-        if (!existing.getSellerId().equals(requesterId)) {
-            throw new RuntimeException("Hanya seller pemilik listing yang dapat mengubah data ini.");
-        }
-
-        if (existing.getStatus() != null && existing.getStatus().isActive()) {
-            throw new RuntimeException("Listing tidak bisa diupdate saat auction masih aktif.");
-        }
+        validateListingOwnership(existing, requesterId, admin);
+        validateListingNotActive(existing, "diupdate");
+        validateReservePrice(request.startingPrice(), request.reservePrice());
 
         existing.setCategoryId(request.categoryId());
         existing.setTitle(request.title());
@@ -83,41 +81,28 @@ public class ListingService {
         existing.setStartingPrice(request.startingPrice());
         existing.setReservePrice(request.reservePrice());
         existing.setEndTime(request.endTime());
+        existing.setAuctionType(request.auctionType() == null ? AuctionType.ENGLISH : request.auctionType());
         return listingRepository.save(existing);
     }
 
-    public void deleteListing(UUID id, UUID requesterId) {
+    public void deleteListing(UUID id, UUID requesterId, boolean admin) {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Listing tidak ditemukan dengan ID: " + id));
 
-        if (!existing.getSellerId().equals(requesterId)) {
-            throw new RuntimeException("Hanya seller pemilik listing yang dapat menghapus data ini.");
-        }
-
-        if (existing.getStatus() != null && existing.getStatus().isActive()) {
-            throw new RuntimeException("Listing tidak bisa dihapus saat auction masih aktif.");
-        }
-
+        validateListingOwnership(existing, requesterId, admin);
+        validateListingNotActive(existing, "dihapus");
         listingRepository.delete(existing);
     }
 
     public List<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice) {
-        UUID categoryId = null;
-        if (category != null && !category.isEmpty()) {
-            try {
-                categoryId = UUID.fromString(category);
-            } catch (IllegalArgumentException e) {
-                // Invalid UUID, ignore category filter
-            }
-        }
-        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice);
+        validatePriceRange(minPrice, maxPrice);
+        return listingRepository.findBySearchCriteria(normalizeKeyword(keyword), parseCategoryId(category), minPrice, maxPrice);
     }
 
     public Page<Listing> searchListings(String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
-        UUID categoryId = parseCategoryId(category);
-        // Native query has its own ORDER BY — strip sort from pageable to prevent camelCase column clash
+        validatePriceRange(minPrice, maxPrice);
         Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-        return listingRepository.findBySearchCriteria(keyword, categoryId, minPrice, maxPrice, unsorted);
+        return listingRepository.findBySearchCriteria(normalizeKeyword(keyword), parseCategoryId(category), minPrice, maxPrice, unsorted);
     }
 
     public List<Listing> getActiveListings() {
@@ -126,6 +111,40 @@ public class ListingService {
 
     public Page<Listing> getActiveListings(Pageable pageable) {
         return listingRepository.findActiveListings(pageable);
+    }
+
+    private void validateReservePrice(BigDecimal startingPrice, BigDecimal reservePrice) {
+        if (reservePrice != null && startingPrice != null && reservePrice.compareTo(startingPrice) < 0) {
+            throw new IllegalArgumentException("Reserve price tidak boleh lebih kecil dari starting price.");
+        }
+    }
+
+    private void validatePriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
+        if (minPrice != null && minPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Minimum price tidak boleh negatif.");
+        }
+        if (maxPrice != null && maxPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Maximum price tidak boleh negatif.");
+        }
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new IllegalArgumentException("Minimum price tidak boleh lebih besar dari maximum price.");
+        }
+    }
+
+    private void validateListingNotActive(Listing listing, String action) {
+        if (listing.getStatus() != null && listing.getStatus().isActive()) {
+            throw new IllegalArgumentException("Listing tidak bisa " + action + " saat auction masih aktif.");
+        }
+    }
+
+    private void validateListingOwnership(Listing listing, UUID requesterId, boolean admin) {
+        if (!admin && !listing.getSellerId().equals(requesterId)) {
+            throw new AccessDeniedException("User tidak memiliki akses ke listing ini.");
+        }
+    }
+
+    private String normalizeKeyword(String keyword) {
+        return keyword == null || keyword.isBlank() ? null : keyword.trim();
     }
 
     private UUID parseCategoryId(String category) {
