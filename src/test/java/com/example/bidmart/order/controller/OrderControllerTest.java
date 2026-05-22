@@ -79,7 +79,8 @@ class OrderControllerTest {
         UUID otherId = UUID.randomUUID();
         when(authentication.getName()).thenReturn("other");
         when(userService.getUserIdByUsername("other")).thenReturn(otherId);
-        doReturn(Collections.emptyList()).when(authentication).getAuthorities();
+        GrantedAuthority userAuthority = () -> "ROLE_USER";
+        doReturn(List.of(userAuthority)).when(authentication).getAuthorities();
 
         assertThrows(AccessDeniedException.class,
                 () -> orderController.getOrdersByBuyer(buyerId, authentication));
@@ -105,6 +106,14 @@ class OrderControllerTest {
         ResponseEntity<List<Order>> response = orderController.getOrdersByBuyer(buyerId, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void isAdmin_nullAuthentication_returnsFalse() throws Exception {
+        java.lang.reflect.Method isAdminMethod = OrderController.class.getDeclaredMethod("isAdmin", Authentication.class);
+        isAdminMethod.setAccessible(true);
+        boolean result = (boolean) isAdminMethod.invoke(orderController, (Authentication) null);
+        assertFalse(result);
     }
 
     // ── updateTrackingNumber ──────────────────────────────────────────────────
