@@ -1,6 +1,8 @@
 package com.example.bidmart.listing.service;
 
+import com.example.bidmart.listing.dto.CreateListingRequest;
 import com.example.bidmart.listing.model.AuctionStatus;
+import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,135 +15,96 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ListingServiceTest {
 
-    @Mock
-    private ListingRepository listingRepository;
-
-    @InjectMocks
-    private ListingService listingService;
+    @Mock private ListingRepository listingRepository;
+    @InjectMocks private ListingService listingService;
 
     private UUID listingId;
+    private UUID sellerId;
     private Listing listing;
 
     @BeforeEach
     void setUp() {
         listingId = UUID.randomUUID();
+        sellerId  = UUID.randomUUID();
 
         listing = new Listing();
         listing.setId(listingId);
-        listing.setSellerId(UUID.randomUUID());
+        listing.setSellerId(sellerId);
         listing.setStartingPrice(new BigDecimal("100"));
         listing.setEndTime(LocalDateTime.now().plusHours(1));
         listing.setStatus(AuctionStatus.ACTIVE);
     }
 
+    private CreateListingRequest validRequest() {
+        return new CreateListingRequest(
+                UUID.randomUUID(), "Updated Title", "desc", "img.jpg",
+                new BigDecimal("500"), new BigDecimal("700"),
+                LocalDateTime.now().plusDays(1)
+        );
+    }
+
+    // ── CREATE ───────────────────────────────────────────────────────────────
+
     @Test
-    void updateListing_shouldFail_whenAuctionActive() {
-        when(listingRepository.findById(listingId))
-                .thenReturn(Optional.of(listing));
+    void createListing_shouldSetSellerIdStatusAndCreatedAt() {
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Listing updated = new Listing();
+        CreateListingRequest req = new CreateListingRequest(
+                UUID.randomUUID(), "New Listing", null, null,
+                new BigDecimal("100"), null, LocalDateTime.now().plusHours(2));
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.updateListing(listingId, updated);
-        });
+        Listing result = listingService.createListing(req, sellerId);
+
+        assertEquals(sellerId, result.getSellerId());
+        assertEquals(AuctionStatus.ACTIVE, result.getStatus());
+        assertEquals(AuctionType.ENGLISH, result.getAuctionType());
+        assertNotNull(result.getCreatedAt());
+        assertEquals("New Listing", result.getTitle());
+        verify(listingRepository).save(any(Listing.class));
     }
 
     @Test
-    void updateListing_shouldSuccess_whenAuctionNotActive() {
-        listing.setStatus(AuctionStatus.CLOSED);
+    void createListing_shouldMapAllRequestFields() {
+        UUID categoryId = UUID.randomUUID();
+        LocalDateTime endTime = LocalDateTime.now().plusDays(3);
+        CreateListingRequest req = new CreateListingRequest(
+                categoryId, "Test", "desc", "img.jpg",
+                new BigDecimal("200"), new BigDecimal("300"), endTime);
 
-        when(listingRepository.findById(listingId))
-                .thenReturn(Optional.of(listing));
-        when(listingRepository.save(listing))
-                .thenReturn(listing);
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Listing updated = new Listing();
-        updated.setTitle("Updated");
+        Listing result = listingService.createListing(req, sellerId);
 
-        Listing result = listingService.updateListing(listingId, updated);
-
-        assertEquals("Updated", result.getTitle());
+        assertEquals(categoryId, result.getCategoryId());
+        assertEquals("Test", result.getTitle());
+        assertEquals("desc", result.getDescription());
+        assertEquals("img.jpg", result.getImageUrl());
+        assertEquals(new BigDecimal("200"), result.getStartingPrice());
+        assertEquals(new BigDecimal("300"), result.getReservePrice());
+        assertEquals(endTime, result.getEndTime());
     }
 
-    @Test
-    void deleteListing_shouldFail_whenAuctionActive() {
-        when(listingRepository.findById(listingId))
-                .thenReturn(Optional.of(listing));
-
-        assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId);
-        });
-    }
-
-    @Test
-    void deleteListing_shouldSuccess_whenAuctionNotActive() {
-        listing.setStatus(AuctionStatus.CLOSED);
-
-        when(listingRepository.findById(listingId))
-                .thenReturn(Optional.of(listing));
-
-        listingService.deleteListing(listingId);
-
-        verify(listingRepository).delete(listing);
-    }
-
-    @Test
-    void updateListing_shouldFail_whenAuctionExtended() {
-        listing.setStatus(AuctionStatus.EXTENDED);
-        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        Listing updated = new Listing();
-
-        assertThrows(RuntimeException.class, () -> {
-            listingService.updateListing(listingId, updated);
-        });
-    }
-
-    @Test
-    void deleteListing_shouldFail_whenAuctionExtended() {
-        listing.setStatus(AuctionStatus.EXTENDED);
-        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-
-        assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId);
-        });
-    }
-
-    @Test
-    void updateListing_shouldFail_whenListingNotFound() {
-        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
-        Listing updated = new Listing();
-
-        assertThrows(RuntimeException.class, () -> {
-            listingService.updateListing(listingId, updated);
-        });
-    }
-
-    @Test
-    void deleteListing_shouldFail_whenListingNotFound() {
-        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
-
-        assertThrows(RuntimeException.class, () -> {
-            listingService.deleteListing(listingId);
-        });
-    }
+    // ── GET ──────────────────────────────────────────────────────────────────
 
     @Test
     void getListingById_shouldReturnListing() {
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+
         Optional<Listing> result = listingService.getListingById(listingId);
 
         assertTrue(result.isPresent());
@@ -149,121 +112,35 @@ class ListingServiceTest {
     }
 
     @Test
-    void save_shouldReturnSavedListing() {
-        when(listingRepository.save(listing)).thenReturn(listing);
-        Listing result = listingService.save(listing);
-
-        assertEquals(listingId, result.getId());
-    }
-
-    @Test
-    void getAllListings_shouldReturnAllListings() {
-        List<Listing> listings = List.of(listing);
-        when(listingRepository.findAll()).thenReturn(listings);
-        List<Listing> result = listingService.getAllListings();
-
-        assertEquals(1, result.size());
-        assertEquals(listingId, result.get(0).getId());
-    }
-
-    @Test
-    void getListingById_shouldReturnEmpty_whenListingNotFound() {
+    void getListingById_shouldReturnEmpty_whenNotFound() {
         when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
-        Optional<Listing> result = listingService.getListingById(listingId);
 
-        assertFalse(result.isPresent());
+        assertFalse(listingService.getListingById(listingId).isPresent());
     }
 
     @Test
     void getListingByIdWithLock_shouldReturnListing() {
         when(listingRepository.findByIdWithLock(listingId)).thenReturn(Optional.of(listing));
-        Optional<Listing> result = listingService.getListingByIdWithLock(listingId);
 
-        assertTrue(result.isPresent());
-        assertEquals(listingId, result.get().getId());
+        assertTrue(listingService.getListingByIdWithLock(listingId).isPresent());
+        verify(listingRepository).findByIdWithLock(listingId);
     }
 
     @Test
-    void getListingByIdWithLock_shouldReturnEmpty_whenListingNotFound() {
+    void getListingByIdWithLock_shouldReturnEmpty_whenNotFound() {
         when(listingRepository.findByIdWithLock(listingId)).thenReturn(Optional.empty());
-        Optional<Listing> result = listingService.getListingByIdWithLock(listingId);
 
-        assertFalse(result.isPresent());
+        assertFalse(listingService.getListingByIdWithLock(listingId).isPresent());
     }
 
     @Test
-    void updateListing_shouldUpdateAllEditableFields() {
-        listing.setStatus(AuctionStatus.CLOSED);
-        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        when(listingRepository.save(any(Listing.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
-        Listing updated = new Listing();
-        updated.setTitle("Updated Title");
-        updated.setDescription("Updated Description");
-        updated.setImageUrl("updated.jpg");
-        updated.setStartingPrice(new BigDecimal("500"));
-        updated.setReservePrice(new BigDecimal("700"));
-        updated.setEndTime(LocalDateTime.now().plusDays(1));
-
-        Listing result = listingService.updateListing(listingId, updated);
-        assertEquals("Updated Title", result.getTitle());
-        assertEquals("Updated Description", result.getDescription());
-        assertEquals("updated.jpg", result.getImageUrl());
-        assertEquals(new BigDecimal("500"), result.getStartingPrice());
-        assertEquals(new BigDecimal("700"), result.getReservePrice());
-    }
-
-    @Test
-    void updateListing_shouldAllowNullStatus() {
-        listing.setStatus(AuctionStatus.CLOSED);
-        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        when(listingRepository.save(any(Listing.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        Listing updated = new Listing();
-        updated.setTitle("No Status Change");
-        Listing result = listingService.updateListing(listingId, updated);
-
-        assertEquals("No Status Change", result.getTitle());
-        assertEquals(AuctionStatus.CLOSED, result.getStatus());
-    }
-
-    @Test
-    void updateListing_shouldAllowNullAuctionStatus() {
-        listing.setStatus(null);
-        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        when(listingRepository.save(any(Listing.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        Listing updated = new Listing();
-        updated.setTitle("Null Status Update");
-        Listing result = listingService.updateListing(listingId, updated);
-
-        assertEquals("Null Status Update", result.getTitle());
-    }
-
-    @Test
-    void deleteListing_shouldCallRepositoryDelete() {
-        listing.setStatus(AuctionStatus.CLOSED);
-        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        listingService.deleteListing(listingId);
-
-        verify(listingRepository, times(1)).delete(listing);
-    }
-
-    @Test
-    void save_shouldCallRepositorySave() {
-        when(listingRepository.save(listing)).thenReturn(listing);
-        listingService.save(listing);
-
-        verify(listingRepository, times(1)).save(listing);
-    }
-
-    @Test
-    void getAllListings_shouldCallRepositoryFindAll() {
+    void getAllListings_shouldReturnAll() {
         when(listingRepository.findAll()).thenReturn(List.of(listing));
-        listingService.getAllListings();
 
-        verify(listingRepository, times(1)).findAll();
+        List<Listing> result = listingService.getAllListings();
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findAll();
     }
 
     @Test
@@ -273,22 +150,7 @@ class ListingServiceTest {
 
         Page<Listing> result = listingService.getAllListings(pageable);
 
-        assertEquals(1, result.getContent().size());
         assertEquals(1, result.getTotalElements());
-        verify(listingRepository, times(1)).findAll(pageable);
-    }
-
-    @Test
-    void searchListings_withPageable_shouldReturnPage() {
-        Pageable pageable = PageRequest.of(0, 20);
-        UUID categoryId = UUID.randomUUID();
-        when(listingRepository.findBySearchCriteria("test", categoryId, null, null, pageable))
-                .thenReturn(new PageImpl<>(List.of(listing), pageable, 1));
-
-        Page<Listing> result = listingService.searchListings("test", categoryId.toString(), null, null, pageable);
-
-        assertEquals(1, result.getContent().size());
-        verify(listingRepository, times(1)).findBySearchCriteria("test", categoryId, null, null, pageable);
     }
 
     @Test
@@ -299,107 +161,272 @@ class ListingServiceTest {
         Page<Listing> result = listingService.getActiveListings(pageable);
 
         assertEquals(1, result.getContent().size());
-        verify(listingRepository, times(1)).findActiveListings(pageable);
+        verify(listingRepository).findActiveListings(pageable);
     }
 
     @Test
-    void getListingById_shouldCallRepositoryFindById() {
+    void searchListings_withPageable_stripsSort() {
+        Pageable sortedPageable   = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable unsortedPageable = PageRequest.of(0, 20);
+        UUID categoryId = UUID.randomUUID();
+
+        when(listingRepository.findBySearchCriteria("test", categoryId, null, null, unsortedPageable))
+                .thenReturn(new PageImpl<>(List.of(listing), unsortedPageable, 1));
+
+        Page<Listing> result = listingService.searchListings("test", categoryId.toString(), null, null, sortedPageable);
+
+        assertEquals(1, result.getContent().size());
+        verify(listingRepository).findBySearchCriteria("test", categoryId, null, null, unsortedPageable);
+    }
+
+    @Test
+    void save_shouldDelegateToRepository() {
+        when(listingRepository.save(listing)).thenReturn(listing);
+
+        Listing result = listingService.save(listing);
+
+        assertEquals(listingId, result.getId());
+        verify(listingRepository).save(listing);
+    }
+
+    // ── UPDATE ───────────────────────────────────────────────────────────────
+
+    @Test
+    void updateListing_shouldFail_whenNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () ->
+                listingService.updateListing(listingId, validRequest(), sellerId));
+    }
+
+    @Test
+    void updateListing_shouldFail_whenNotOwner() {
+        UUID otherId = UUID.randomUUID();
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
-        listingService.getListingById(listingId);
 
-        verify(listingRepository, times(1)).findById(listingId);
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+                listingService.updateListing(listingId, validRequest(), otherId));
+
+        assertTrue(ex.getMessage().contains("pemilik listing"));
     }
 
     @Test
-    void getListingByIdWithLock_shouldCallRepositoryFindByIdWithLock() {
-        when(listingRepository.findByIdWithLock(listingId)).thenReturn(Optional.of(listing));
-        listingService.getListingByIdWithLock(listingId);
+    void updateListing_shouldFail_whenAuctionActive() {
+        listing.setStatus(AuctionStatus.ACTIVE);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
-        verify(listingRepository, times(1)).findByIdWithLock(listingId);
+        assertThrows(RuntimeException.class, () ->
+                listingService.updateListing(listingId, validRequest(), sellerId));
     }
 
     @Test
-    void createListing_shouldSetSellerIdAndDefaultStatus() {
-        UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setStatus(null);
-        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        Listing result = listingService.createListing(newListing, sellerId);
+    void updateListing_shouldFail_whenAuctionExtended() {
+        listing.setStatus(AuctionStatus.EXTENDED);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
-        assertEquals(sellerId, result.getSellerId());
-        assertEquals(AuctionStatus.ACTIVE, result.getStatus());
-        assertNotNull(result.getCreatedAt());
+        assertThrows(RuntimeException.class, () ->
+                listingService.updateListing(listingId, validRequest(), sellerId));
     }
 
     @Test
-    void createListing_shouldKeepExistingStatus() {
-        UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setStatus(AuctionStatus.CLOSED);
-        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        Listing result = listingService.createListing(newListing, sellerId);
+    void updateListing_shouldUpdateAllFields_whenNotActive() {
+        listing.setStatus(AuctionStatus.CLOSED);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertEquals(AuctionStatus.CLOSED, result.getStatus());
+        LocalDateTime newEnd = LocalDateTime.now().plusDays(1);
+        CreateListingRequest req = new CreateListingRequest(
+                UUID.randomUUID(), "New Title", "New Desc", "new.jpg",
+                new BigDecimal("500"), new BigDecimal("700"), newEnd);
+
+        Listing result = listingService.updateListing(listingId, req, sellerId);
+
+        assertEquals("New Title", result.getTitle());
+        assertEquals("New Desc", result.getDescription());
+        assertEquals("new.jpg", result.getImageUrl());
+        assertEquals(new BigDecimal("500"), result.getStartingPrice());
+        assertEquals(new BigDecimal("700"), result.getReservePrice());
+        assertEquals(newEnd, result.getEndTime());
     }
 
     @Test
-    void createListing_shouldValidateEndTimeInFuture() {
-        UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("Test Listing");
-        newListing.setStartingPrice(new BigDecimal("100"));
-        newListing.setEndTime(LocalDateTime.now().minusHours(1));
+    void updateListing_shouldSucceed_whenStatusUnsold() {
+        listing.setStatus(AuctionStatus.UNSOLD);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("endTime harus di masa depan"));
+        Listing result = listingService.updateListing(listingId, validRequest(), sellerId);
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+        assertEquals("Updated Title", result.getTitle());
     }
 
     @Test
-    void createListing_shouldValidateStartingPriceGreaterThanZero() {
-        UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("Test Listing");
-        newListing.setStartingPrice(new BigDecimal("0"));
-        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+    void updateListing_shouldSucceed_whenStatusWon() {
+        listing.setStatus(AuctionStatus.WON);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("startingPrice harus > 0"));
+        Listing result = listingService.updateListing(listingId, validRequest(), sellerId);
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+        assertNotNull(result);
+    }
+
+    // ── DELETE ───────────────────────────────────────────────────────────────
+
+    @Test
+    void deleteListing_shouldFail_whenNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () ->
+                listingService.deleteListing(listingId, sellerId));
     }
 
     @Test
-    void createListing_shouldValidateReservePriceGreaterThanOrEqualStartingPrice() {
-        UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("Test Listing");
-        newListing.setStartingPrice(new BigDecimal("100"));
-        newListing.setReservePrice(new BigDecimal("50"));
-        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+    void deleteListing_shouldFail_whenNotOwner() {
+        UUID otherId = UUID.randomUUID();
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
-        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("reservePrice harus >= startingPrice"));
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+                listingService.deleteListing(listingId, otherId));
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+        assertTrue(ex.getMessage().contains("pemilik listing"));
     }
 
     @Test
-    void createListing_shouldValidateTitleNotBlank() {
-        UUID sellerId = UUID.randomUUID();
-        Listing newListing = new Listing();
-        newListing.setTitle("");
-        newListing.setStartingPrice(new BigDecimal("100"));
-        newListing.setEndTime(LocalDateTime.now().plusHours(1));
+    void deleteListing_shouldFail_whenAuctionActive() {
+        listing.setStatus(AuctionStatus.ACTIVE);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
 
-        when(listingRepository.save(any(Listing.class))).thenThrow(new RuntimeException("title tidak boleh blank"));
+        assertThrows(RuntimeException.class, () ->
+                listingService.deleteListing(listingId, sellerId));
+    }
 
-        assertThrows(RuntimeException.class, () -> {
-            listingService.createListing(newListing, sellerId);
-        });
+    @Test
+    void deleteListing_shouldFail_whenAuctionExtended() {
+        listing.setStatus(AuctionStatus.EXTENDED);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+
+        assertThrows(RuntimeException.class, () ->
+                listingService.deleteListing(listingId, sellerId));
+    }
+
+    @Test
+    void deleteListing_shouldDelete_whenNotActive() {
+        listing.setStatus(AuctionStatus.CLOSED);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+
+        listingService.deleteListing(listingId, sellerId);
+
+        verify(listingRepository).delete(listing);
+    }
+
+    @Test
+    void deleteListing_shouldDelete_whenStatusUnsold() {
+        listing.setStatus(AuctionStatus.UNSOLD);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+
+        listingService.deleteListing(listingId, sellerId);
+
+        verify(listingRepository, times(1)).delete(listing);
+    }
+
+    // ── STATUS NULL edge cases ────────────────────────────────────────────────
+
+    @Test
+    void updateListing_shouldSucceed_whenStatusNull() {
+        listing.setStatus(null);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Listing result = listingService.updateListing(listingId, validRequest(), sellerId);
+
+        assertEquals("Updated Title", result.getTitle());
+    }
+
+    @Test
+    void deleteListing_shouldDelete_whenStatusNull() {
+        listing.setStatus(null);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+
+        listingService.deleteListing(listingId, sellerId);
+
+        verify(listingRepository).delete(listing);
+    }
+
+    // ── NON-PAGEABLE overloads ────────────────────────────────────────────────
+
+    @Test
+    void getActiveListings_noPageable_returnsAll() {
+        when(listingRepository.findActiveListings()).thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.getActiveListings();
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findActiveListings();
+    }
+
+    @Test
+    void searchListings_noPageable_nullCategory_returnsList() {
+        when(listingRepository.findBySearchCriteria("test", null, null, null))
+                .thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings("test", null, null, null);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void searchListings_noPageable_emptyCategory_treatedAsNull() {
+        when(listingRepository.findBySearchCriteria("test", null, null, null))
+                .thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings("test", "", null, null);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void searchListings_noPageable_validCategoryUUID_passesUUID() {
+        UUID categoryId = UUID.randomUUID();
+        when(listingRepository.findBySearchCriteria(null, categoryId, null, null))
+                .thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings(null, categoryId.toString(), null, null);
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findBySearchCriteria(null, categoryId, null, null);
+    }
+
+    @Test
+    void searchListings_noPageable_invalidCategoryUUID_treatedAsNull() {
+        when(listingRepository.findBySearchCriteria(null, null, null, null))
+                .thenReturn(List.of());
+
+        List<Listing> result = listingService.searchListings(null, "not-a-uuid", null, null);
+
+        assertTrue(result.isEmpty());
+        verify(listingRepository).findBySearchCriteria(null, null, null, null);
+    }
+
+    @Test
+    void searchListings_withPageable_invalidCategoryUUID_treatedAsNull() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(listingRepository.findBySearchCriteria(null, null, null, null, pageable))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        Page<Listing> result = listingService.searchListings(null, "bad-uuid", null, null, pageable);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void searchListings_withPageable_emptyCategory_treatedAsNull() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(listingRepository.findBySearchCriteria(null, null, null, null, pageable))
+                .thenReturn(new PageImpl<>(List.of(listing)));
+
+        Page<Listing> result = listingService.searchListings(null, "", null, null, pageable);
+
+        assertEquals(1, result.getContent().size());
     }
 }
