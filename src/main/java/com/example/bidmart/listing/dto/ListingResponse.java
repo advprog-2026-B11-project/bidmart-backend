@@ -2,6 +2,7 @@ package com.example.bidmart.listing.dto;
 
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.AuctionType;
+import com.example.bidmart.listing.model.Listing;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -30,5 +31,25 @@ public class ListingResponse {
     private AuctionStatus status;
     private AuctionType auctionType;
     private BigDecimal currentHighestBid;
+    private UUID currentHighestBidderId;
     private LocalDateTime createdAt;
+
+    public static ListingResponse from(Listing listing) {
+        return ListingResponse.builder()
+                .id(listing.getId())
+                .sellerId(listing.getSellerId())
+                .categoryId(listing.getCategoryId())
+                .title(listing.getTitle())
+                .description(listing.getDescription())
+                .imageUrl(listing.getImageUrl())
+                .startingPrice(listing.getStartingPrice())
+                .reservePrice(listing.getReservePrice())
+                .endTime(listing.getEndTime())
+                .status(listing.getStatus())
+                .auctionType(listing.getAuctionType())
+                .currentHighestBid(listing.getCurrentHighestBid())
+                .currentHighestBidderId(listing.getCurrentHighestBidderId())
+                .createdAt(listing.getCreatedAt())
+                .build();
+    }
 }
