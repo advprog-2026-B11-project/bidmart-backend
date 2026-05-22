@@ -329,6 +329,9 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Refresh token expired or revoked. Please login again.");
         }
         User user = session.getUser();
+        if (!user.isActive()) {
+            throw new IllegalArgumentException("User account is deactivated.");
+        }
 
         session.setRevoked(true);
         sessionRepository.save(session);
