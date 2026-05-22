@@ -73,14 +73,6 @@ tasks.named('jacocoTestReport') {
     }
 }
 
-tasks.named('jacocoTestReport') {
-	dependsOn test
-	reports {
-		xml.required = true
-		html.required = true
-	}
-}
-
 sonar {
 	properties {
 		property "sonar.projectKey", "advprog-2026-b11-project_bidmart-backend-2"

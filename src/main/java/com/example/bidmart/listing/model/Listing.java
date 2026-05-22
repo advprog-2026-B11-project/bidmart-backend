@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import com.example.bidmart.common.validation.OnCreate;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
@@ -62,7 +63,7 @@ public class Listing {
     @DecimalMin("0.01") @Column(name = "reserve_price")
     private BigDecimal reservePrice;
 
-    @Future @Column(name = "end_time", nullable = false)
+    @Future(groups = OnCreate.class) @Column(name = "end_time", nullable = false)
     private LocalDateTime endTime;
 
     @Enumerated(EnumType.STRING)
@@ -92,6 +93,9 @@ public class Listing {
         }
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (auctionType == null) {
+            auctionType = AuctionType.ENGLISH;
         }
     }
 
