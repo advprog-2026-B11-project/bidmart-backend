@@ -47,14 +47,18 @@ public class ListingController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<Listing>> searchListings(
+    public ResponseEntity<?> searchListings(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice
     ) {
-        List<Listing> results = listingService.searchListings(keyword, category, minPrice, maxPrice);
-        return ResponseEntity.ok(results);
+        try {
+            List<Listing> results = listingService.searchListings(keyword, category, minPrice, maxPrice);
+            return ResponseEntity.ok(results);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/active")
