@@ -3,25 +3,31 @@ package com.example.bidmart.listing.repository;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.Listing;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@DataJpaTest(showSql = false, properties = {
-        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.properties.hibernate.validator.apply_to_ddl=false"
-})
+@SpringBootTest
+@ActiveProfiles("test")
 class ListingRepositoryTest {
 
     @Autowired
     private ListingRepository listingRepository;
+
+    @BeforeEach
+    void setUp() {
+        listingRepository.deleteAll();
+    }
 
     @Test
     void findBySearchCriteria_shouldFilterByKeyword() {

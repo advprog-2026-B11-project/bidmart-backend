@@ -2,6 +2,8 @@ package com.example.bidmart.bidding.service;
 
 import com.example.bidmart.bidding.dto.BidResponse;
 import com.example.bidmart.bidding.dto.CreateBidRequest;
+import com.example.bidmart.bidding.exception.BidConflictException;
+import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.bidding.model.Bid;
@@ -27,6 +29,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -477,6 +480,101 @@ class BidServiceTest {
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).buyerId()).isEqualTo(buyerId);
+        }
+    }
+
+    @Nested
+    class GetMinimumNextBid {
+
+        @Test
+        void nullListingId_throws() {
+            assertThatThrownBy(() -> bidService.getMinimumNextBid(null))
+                    .isInstanceOf(BidValidationException.class)
+                    .hasMessageContaining("listingId wajib diisi.");
+        }
+
+        @Test
+        void listingNotFound_throws() {
+            UUID listingId = UUID.randomUUID();
+            when(listingService.getListingById(listingId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> bidService.getMinimumNextBid(listingId))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining(listingId.toString());
+        }
+
+        @Test
+        void validListing_returnsMinimumBid() {
+            UUID listingId = UUID.randomUUID();
+            Listing listing = activeListing(listingId, UUID.randomUUID(), new BigDecimal("100.00"));
+
+            when(listingService.getListingById(listingId)).thenReturn(Optional.of(listing));
+            when(auctionStrategy.computeMinimumNextBid(any())).thenReturn(new BigDecimal("101.00"));
+
+            BigDecimal result = bidService.getMinimumNextBid(listingId);
+
+            assertThat(result).isEqualByComparingTo(new BigDecimal("101.00"));
+        }
+    }
+
+    @Nested
+    class RecoverFromConflict {
+
+        @Test
+        void recoverFromConflict_throwsBidConflictException() {
+            ObjectOptimisticLockingFailureException ex = new ObjectOptimisticLockingFailureException("conflict", null);
+            UUID buyerId = UUID.randomUUID();
+            CreateBidRequest request = new CreateBidRequest(UUID.randomUUID(), new BigDecimal("100"), false, null);
+
+            assertThatThrownBy(() -> bidService.recoverFromConflict(ex, buyerId, request))
+                    .isInstanceOf(BidConflictException.class)
+                    .hasMessageContaining("konflik penawaran");
+        }
+    }
+
+    @Nested
+    class StrategyValidation {
+
+        @Test
+        void strategyValidationFails_throwsBidTooLowException() {
+            UUID listingId = UUID.randomUUID();
+            UUID buyerId = UUID.randomUUID();
+            BigDecimal amount = new BigDecimal("50.00");
+            CreateBidRequest request = new CreateBidRequest(listingId, amount, false, null);
+
+            when(listingService.getListingByIdWithLock(listingId))
+                    .thenReturn(Optional.of(activeListing(listingId, UUID.randomUUID(), new BigDecimal("100.00"))));
+            when(bidRepository.findTopByListingIdOrderByAmountDescCreatedAtAsc(listingId))
+                    .thenReturn(Optional.empty());
+            when(auctionStrategy.validateBid(any(), any()))
+                    .thenReturn(ValidationResult.fail("Bid terlalu rendah"));
+            when(auctionStrategy.computeMinimumNextBid(any()))
+                    .thenReturn(new BigDecimal("101.00"));
+
+            assertThatThrownBy(() -> bidService.placeBid(buyerId, request))
+                    .isInstanceOf(BidTooLowException.class);
+        }
+
+        @Test
+        void strategyDoesNotRequireFundHolding_skipReserve() {
+            UUID listingId = UUID.randomUUID();
+            UUID buyerId = UUID.randomUUID();
+            BigDecimal amount = new BigDecimal("150.00");
+            CreateBidRequest request = new CreateBidRequest(listingId, amount, false, null);
+
+            when(auctionStrategy.requiresFundHolding()).thenReturn(false);
+            when(listingService.getListingByIdWithLock(listingId))
+                    .thenReturn(Optional.of(activeListing(listingId, UUID.randomUUID(), new BigDecimal("100.00"))));
+            when(bidRepository.findTopByListingIdOrderByAmountDescCreatedAtAsc(listingId))
+                    .thenReturn(Optional.empty());
+            when(bidRepository.findTopByListingIdAndBuyerIdOrderByCreatedAtDesc(listingId, buyerId))
+                    .thenReturn(Optional.empty());
+            when(bidRepository.save(any(Bid.class)))
+                    .thenAnswer(inv -> regularBid(listingId, buyerId, amount));
+
+            bidService.placeBid(buyerId, request);
+
+            verify(walletService, never()).reserveBidFunds(any(), any(), any());
         }
     }
 }
