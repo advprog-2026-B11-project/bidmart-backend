@@ -7,6 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ChangeUserRoleRequest {
-    @NotBlank(message = "Role name is required")
-    private String roleName;
+    @NotBlank(message = "Role is required")
+    private String role;
 }

@@ -2,6 +2,7 @@ package com.example.bidmart.user.service;
 
 import com.example.bidmart.common.event.UserDeactivatedEvent;
 import com.example.bidmart.common.event.UserRoleChangedEvent;
+import com.example.bidmart.user.dto.AdminUserResponse;
 import com.example.bidmart.user.dto.MfaSetupResponse;
 import com.example.bidmart.user.dto.MfaStatusResponse;
 import com.example.bidmart.user.dto.UpdateProfileRequest;
@@ -11,6 +12,8 @@ import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -184,6 +187,25 @@ public class UserServiceImpl implements UserService {
             userRepository.save(user);
         }
         return mapToMfaStatus(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> listUsers(String search, String role, Pageable pageable) {
+        String searchParam = (search == null || search.isBlank()) ? "" : search.trim();
+        String roleParam = (role == null || role.isBlank()) ? "" : role.trim();
+        return userRepository.findAllWithFilters(searchParam, roleParam, pageable)
+                .map(AdminUserResponse::from);
+    }
+
+    @Override
+    @Transactional
+    public void reactivateUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        if (user.isActive()) return;
+        user.setActive(true);
+        userRepository.save(user);
     }
 
     @Override
