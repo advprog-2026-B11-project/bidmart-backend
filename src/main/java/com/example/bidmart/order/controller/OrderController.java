@@ -30,7 +30,9 @@ public class OrderController {
     @PreAuthorize("hasAuthority('order:read') and (#buyerId.toString() == authentication.name or hasAuthority('SCOPE_ADMIN'))")
     public ResponseEntity<List<Order>> getOrdersByBuyer(@PathVariable UUID buyerId) {
         List<Order> orders = orderService.getOrdersByBuyer(buyerId);
-      
+        return ResponseEntity.ok(orders);
+    }
+
     private UUID resolveCurrentUserId(Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {
             throw new AccessDeniedException("User belum terautentikasi.");
