@@ -70,7 +70,7 @@ class NotificationEventListenerTest {
         UUID sellerId = UUID.randomUUID();
         BigDecimal amount = BigDecimal.valueOf(50000);
 
-        OrderDeliveredEvent event = new OrderDeliveredEvent(orderId, buyerId, sellerId, amount);
+        OrderDeliveredEvent event = new OrderDeliveredEvent(orderId, UUID.randomUUID(), buyerId, sellerId, amount);
         notificationEventListener.handleOrderDelivered(event);
 
         verify(notificationService, times(1)).createNotification(eq(sellerId), eq("ORDER_DELIVERED"), anyString());
@@ -82,7 +82,7 @@ class NotificationEventListenerTest {
         UUID buyerId = UUID.randomUUID();
         BigDecimal amount = BigDecimal.valueOf(50000);
 
-        OrderRefundedEvent event = new OrderRefundedEvent(orderId, buyerId, amount);
+        OrderRefundedEvent event = new OrderRefundedEvent(orderId, UUID.randomUUID(), buyerId, amount);
         notificationEventListener.handleOrderRefunded(event);
 
         verify(notificationService, times(1)).createNotification(eq(buyerId), eq("ORDER_REFUNDED"), anyString());
