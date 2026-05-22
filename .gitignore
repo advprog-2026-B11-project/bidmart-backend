@@ -38,10 +38,10 @@ out/
 
 ### Environment & Credentials ###
 .env
-.env
+.env.*
 .env.local
 .env.*.local
-!.env
+!.env.example
 
 ### Spring Boot Local Config ###
 application-local.properties
