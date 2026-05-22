@@ -9,6 +9,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -25,18 +26,27 @@ public class UserExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .map(e -> e.getField() + ": " + e.getDefaultMessage())
+                .findFirst()
+                .orElse("Validation failed.");
+        return build(HttpStatus.BAD_REQUEST, "Bad Request", message);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
-            return buildResponse(HttpStatus.UNAUTHORIZED, "Authentication required.");
+            return build(HttpStatus.UNAUTHORIZED, "Unauthorized", "Authentication required.");
         }
-        return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+        return build(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception ex) {
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+    public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", ex.getMessage());
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String error, String message) {

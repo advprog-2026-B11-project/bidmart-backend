@@ -33,8 +33,8 @@ public class AuthServiceImpl implements AuthService {
     private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
     private static final long DEFAULT_EMAIL_MFA_TTL_SECONDS = 300L;
     private static final int DEFAULT_MAX_CONCURRENT_SESSIONS = 3;
-    private static final String DEFAULT_ROLE_NAME = "USER";
-    private static final Set<String> REGISTRABLE_ROLE_NAMES = Set.of("USER", "SELLER");
+    private static final String DEFAULT_ROLE_NAME = "BUYER";
+    private static final Set<String> REGISTRABLE_ROLE_NAMES = Set.of("BUYER", "SELLER");
 
     private final SecureRandom secureRandom = new SecureRandom();
 
