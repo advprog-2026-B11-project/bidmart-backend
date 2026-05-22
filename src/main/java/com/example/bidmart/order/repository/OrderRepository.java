@@ -13,7 +13,5 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByBuyerIdOrSellerId(UUID buyerId, UUID sellerId);
 
-    List<Order> findByBuyerId(UUID buyerId);
-
     Optional<Order> findByListingId(UUID listingId);
 }
