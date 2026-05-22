@@ -51,7 +51,7 @@ public class NotificationService {
         if (preference.isPushEnabled()) {
             try {
                 messagingTemplate.convertAndSendToUser(
-                        userId.toString(), "/queue/notifications", notification != null ? notification : message
+                        userId.toString(), "/queue/notifications", notification
                 );
             } catch (Exception e) {
                 log.error("Gagal mengirim push WebSocket: {}", e.getMessage());
@@ -59,10 +59,8 @@ public class NotificationService {
             }
         }
 
-        if (notification != null) {
-            notification.setDeliveryStatus(deliverySuccess ? "DELIVERED" : "FAILED");
-            notificationRepository.save(notification);
-        }
+        notification.setDeliveryStatus(deliverySuccess ? "DELIVERED" : "FAILED");
+        notificationRepository.save(notification);
 
         return notification;
     }
@@ -112,22 +110,28 @@ public class NotificationService {
     }
 
     @Transactional
-    public Notification markAsRead(UUID notificationId) {
+    public Notification markAsRead(UUID notificationId, UUID userId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Notif tidak ditemukan"));
+        if (!notification.getUserId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Access Denied");
+        }
         notification.setRead(true);
         return notificationRepository.save(notification);
     }
 
     @Transactional
     public void markAllAsRead(UUID userId) {
-        List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(userId);
-        unread.forEach(n -> n.setRead(true));
-        notificationRepository.saveAll(unread);
+        notificationRepository.markAllAsReadByUserId(userId);
     }
 
     @Transactional
-    public void deleteNotification(UUID notificationId) {
-        notificationRepository.deleteById(notificationId);
+    public void deleteNotification(UUID notificationId, UUID userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notif tidak ditemukan"));
+        if (!notification.getUserId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Access Denied");
+        }
+        notificationRepository.delete(notification);
     }
 }

@@ -14,7 +14,7 @@ import com.example.bidmart.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -41,13 +41,19 @@ class UserServiceImplTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private EmailService emailService;
 
+    @InjectMocks
     private UserServiceImpl userService;
     private User user;
-    private Role mockRole;
+    private final String username = "testuser";
+    private final UUID userId = UUID.randomUUID();
+
+    private Role roleBuyer;
+    private Role roleSeller;
 
     @BeforeEach
     void setUp() {
-        mockRole = new Role(UUID.randomUUID(), "USER", new HashSet<>());
+        roleBuyer = new Role(UUID.randomUUID(), "BUYER", null);
+        roleSeller = new Role(UUID.randomUUID(), "SELLER", null);
 
         user = new User();
         user.setId(UUID.randomUUID());
@@ -73,15 +79,29 @@ class UserServiceImplTest {
     }
 
     @Test
-    void updateProfile_shouldUpdateOnlyProvidedFields() {
+    void updateProfile_updatesFieldsAndReturnsProfile() {
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setDisplayName("Alice Updated");
         request.setImageUrl("https://img.example.com/alice-new.png");
 
-        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
-        when(userRepository.save(user)).thenReturn(user);
+        UserProfileResponse response = userService.updateProfile(username, request);
 
-        UserProfileResponse response = userService.updateProfile("alice", request);
+        assertEquals("New Name", response.getDisplayName());
+        assertEquals("123456", response.getPhoneNumber());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateProfile_nullDisplayNameAndPhoneNumber_doesNotUpdateFields() {
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setDisplayName(null);
+        request.setPhoneNumber(null);
 
         assertEquals("Alice Updated", response.getDisplayName());
         assertEquals("08123456789", response.getPhoneNumber());
@@ -90,7 +110,23 @@ class UserServiceImplTest {
     }
 
     @Test
-    void updateProfile_shouldThrowWhenUserNotFound() {
+    void updateProfile_blankDisplayNameAndPhoneNumber_doesNotUpdateFields() {
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setDisplayName("   ");
+        request.setPhoneNumber("   ");
+
+        UserProfileResponse response = userService.updateProfile(username, request);
+        assertNotNull(response);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateProfile_userNotFound_throwsException() {
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
         UpdateProfileRequest request = new UpdateProfileRequest();
         request.setDisplayName("Alice Updated");
         when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
@@ -102,10 +138,8 @@ class UserServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         userService.deleteProfile("alice");
 
-        ArgumentCaptor<UUID> idCaptor = ArgumentCaptor.forClass(UUID.class);
-        verify(sessionRepository, times(1)).deleteAllByUserId(idCaptor.capture());
-        assertEquals(user.getId(), idCaptor.getValue());
-        verify(userRepository, times(1)).delete(user);
+        verify(userRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

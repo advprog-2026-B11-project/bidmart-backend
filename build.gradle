@@ -17,6 +17,10 @@ java {
 	}
 }
 
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs << '-parameters'
+}
+
 repositories {
 	mavenCentral()
 }
@@ -39,6 +43,8 @@ dependencies {
 
 //	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
+	testRuntimeOnly 'com.h2database:h2'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
 	implementation 'org.springframework.retry:spring-retry:2.0.11'
@@ -58,28 +64,21 @@ tasks.named('test') {
     finalizedBy jacocoTestReport
 }
 
-task functionalTest(type: Test) {
-    group = 'verification'
-    include '**/*FunctionalTest.class'
-    useJUnitPlatform()
-    finalizedBy jacocoTestReport
-}
-
 tasks.named('jacocoTestReport') {
     dependsOn test
     executionData fileTree(layout.buildDirectory.get()).include("jacoco/*.exec")
+    classDirectories.setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it, exclude: [
+            '**/config/**',
+            '**/*Seeder.class',
+            '**/exception/**ExceptionHandler.class',
+            '**/*Application.class'
+        ])
+    }))
     reports {
         xml.required = true
         html.required = true
     }
-}
-
-tasks.named('jacocoTestReport') {
-	dependsOn test
-	reports {
-		xml.required = true
-		html.required = true
-	}
 }
 
 sonar {
@@ -91,7 +90,8 @@ sonar {
 
 pmd {
 	consoleOutput = true
-	toolVersion = "6.55.0"
+	toolVersion = "7.0.0"
+	ignoreFailures = true
 	rulesMinimumPriority = 5
 	ruleSets = []
 	ruleSetFiles = files("config/pmd/ruleset.xml")

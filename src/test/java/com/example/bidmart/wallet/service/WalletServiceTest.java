@@ -1,5 +1,6 @@
 package com.example.bidmart.wallet.service;
 
+import com.example.bidmart.common.event.WithdrawEvent;
 import com.example.bidmart.wallet.dto.TopUpRequest;
 import com.example.bidmart.wallet.dto.WithdrawRequest;
 import com.example.bidmart.wallet.exception.*;
@@ -133,9 +134,17 @@ class WalletServiceTest {
         @Test void exceedsMax_throws() {
             assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, topUpReq(new BigDecimal("200000000"))));
         }
-        @Test void walletNotFound_throws() {
+        @Test void walletNotFound_autoCreatesWallet() {
+            TopUpRequest req = topUpReq(new BigDecimal("1000"));
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.empty());
-            assertThrows(WalletNotFoundException.class, () -> walletService.topUp(userId, topUpReq(new BigDecimal("1000"))));
+            when(walletRepository.save(any(Wallet.class))).thenAnswer(i -> {
+                Wallet w = i.getArgument(0);
+                if (w.getId() == null) w.setId(UUID.randomUUID());
+                return w;
+            });
+
+            Wallet w = walletService.topUp(userId, req);
+            assertEquals(new BigDecimal("1000"), w.getBalanceAvailable());
         }
         @Test void nullPaymentMethod_throws() {
             TopUpRequest req = new TopUpRequest(new BigDecimal("1000"), null, Map.of(), "k");
@@ -145,6 +154,16 @@ class WalletServiceTest {
             when(paymentStrategy.supports(PaymentMethod.GOPAY)).thenReturn(false);
             TopUpRequest req = new TopUpRequest(new BigDecimal("1000"), PaymentMethod.GOPAY, Map.of(), "k");
             assertThrows(InvalidRequestException.class, () -> walletService.topUp(userId, req));
+        }
+        @Test void topUp_nullIdempotencyKey_success() {
+            TopUpRequest req = new TopUpRequest(new BigDecimal("50000"), PaymentMethod.BANK,
+                    Map.of("bankName", "BCA", "accountNumber", "123"), null);
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            Wallet w = walletService.topUp(userId, req);
+            assertEquals(new BigDecimal("50000"), w.getBalanceAvailable());
+            verify(transactionRepository).save(argThat(tx -> tx.getType() == TransactionType.TOPUP && tx.getIdempotencyKey() == null));
         }
     }
 
@@ -185,13 +204,49 @@ class WalletServiceTest {
             walletService.withdraw(userId, req);
             verify(walletRepository, never()).save(any());
         }
+        @Test void withdraw_nullPaymentDetails_fallsBackToBank() {
+            wallet.setBalanceAvailable(new BigDecimal("100000"));
+            WithdrawRequest req = new WithdrawRequest(
+                    new BigDecimal("30000"),
+                    PaymentMethod.BANK,
+                    null,
+                    "IDEMP-NULL-DETAILS"
+            );
+            doNothing().when(paymentStrategy).validateDetails(null);
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            Wallet w = walletService.withdraw(userId, req);
+            assertEquals(new BigDecimal("70000"), w.getBalanceAvailable());
+
+            org.mockito.ArgumentCaptor<Object> eventCaptor = org.mockito.ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            Object event = eventCaptor.getValue();
+            assertTrue(event instanceof WithdrawEvent);
+            assertEquals("Bank", ((WithdrawEvent) event).bankName());
+        }
+        @Test void withdraw_nullIdempotencyKey_success() {
+            wallet.setBalanceAvailable(new BigDecimal("100000"));
+            WithdrawRequest req = new WithdrawRequest(
+                    new BigDecimal("30000"),
+                    PaymentMethod.BANK,
+                    Map.of("bankName", "BCA", "accountNumber", "123"),
+                    null
+            );
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            Wallet w = walletService.withdraw(userId, req);
+            assertEquals(new BigDecimal("70000"), w.getBalanceAvailable());
+            verify(transactionRepository).save(argThat(tx -> tx.getType() == TransactionType.WITHDRAWAL && tx.getIdempotencyKey() == null));
+        }
     }
 
     @Nested class ReserveBidFunds {
         @Test void success_newHold() {
             wallet.setBalanceAvailable(new BigDecimal("100000"));
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(Collections.emptyList());
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(BigDecimal.ZERO);
             when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             Wallet w = walletService.reserveBidFunds(userId, listingId, new BigDecimal("50000"), "k1");
@@ -204,7 +259,7 @@ class WalletServiceTest {
             wallet.setBalanceLocked(new BigDecimal("50000"));
             Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), listingId.toString());
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of(holdTx));
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(holdTx.getAmount());
 
             Wallet w = walletService.reserveBidFunds(userId, listingId, new BigDecimal("50000"), "k1");
             assertEquals(new BigDecimal("100000"), w.getBalanceAvailable());
@@ -214,7 +269,7 @@ class WalletServiceTest {
         @Test void insufficientBalance_throws() {
             wallet.setBalanceAvailable(new BigDecimal("10000"));
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(Collections.emptyList());
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(BigDecimal.ZERO);
 
             assertThrows(InsufficientBalanceException.class,
                     () -> walletService.reserveBidFunds(userId, listingId, new BigDecimal("50000"), "k1"));
@@ -222,11 +277,23 @@ class WalletServiceTest {
         @Test void overloadWithoutIdempotencyKey() {
             wallet.setBalanceAvailable(new BigDecimal("100000"));
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(Collections.emptyList());
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(BigDecimal.ZERO);
             when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             Wallet w = walletService.reserveBidFunds(userId, listingId, new BigDecimal("30000"));
             assertEquals(new BigDecimal("70000"), w.getBalanceAvailable());
+        }
+
+        @Test void idempotent_skipsIfKeyExists() {
+            String key = "IDEMP-RESERVE";
+            when(transactionRepository.findByIdempotencyKey(key))
+                    .thenReturn(Optional.of(new Transaction()));
+            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+
+            Wallet w = walletService.reserveBidFunds(userId, listingId, new BigDecimal("50000"), key);
+            assertEquals(wallet, w);
+            verify(walletRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any(Object.class));
         }
     }
 
@@ -235,7 +302,7 @@ class WalletServiceTest {
             wallet.setBalanceLocked(new BigDecimal("50000"));
             Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), listingId.toString());
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of(holdTx));
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(holdTx.getAmount());
             when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             Wallet w = walletService.releaseBidFunds(userId, listingId, new BigDecimal("30000"), "k1");
@@ -246,7 +313,7 @@ class WalletServiceTest {
         @Test void nothingHeld_noOp() {
             wallet.setBalanceLocked(BigDecimal.ZERO);
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(Collections.emptyList());
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(BigDecimal.ZERO);
 
             Wallet w = walletService.releaseBidFunds(userId, listingId, new BigDecimal("30000"), "k1");
             assertEquals(BigDecimal.ZERO, w.getBalanceLocked());
@@ -256,12 +323,34 @@ class WalletServiceTest {
             wallet.setBalanceLocked(new BigDecimal("20000"));
             Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("20000"), listingId.toString());
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), any())).thenReturn(List.of(holdTx));
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(holdTx.getAmount());
             when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             Wallet w = walletService.releaseBidFunds(userId, listingId, new BigDecimal("99999"), "k1");
             assertEquals(BigDecimal.ZERO, w.getBalanceLocked());
             assertEquals(new BigDecimal("20000"), w.getBalanceAvailable());
+        }
+        @Test void overloadWithoutIdempotencyKey() {
+            wallet.setBalanceLocked(new BigDecimal("50000"));
+            Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), listingId.toString());
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(holdTx.getAmount());
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            Wallet w = walletService.releaseBidFunds(userId, listingId, new BigDecimal("30000"));
+            assertEquals(new BigDecimal("20000"), w.getBalanceLocked());
+        }
+
+        @Test void idempotent_skipsIfKeyExists() {
+            String key = "IDEMP-RELEASE";
+            when(transactionRepository.findByIdempotencyKey(key))
+                    .thenReturn(Optional.of(new Transaction()));
+            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+
+            Wallet w = walletService.releaseBidFunds(userId, listingId, new BigDecimal("30000"), key);
+            assertEquals(wallet, w);
+            verify(walletRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any(Object.class));
         }
     }
 
@@ -270,7 +359,7 @@ class WalletServiceTest {
             wallet.setBalanceLocked(new BigDecimal("50000"));
             Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), "REF");
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), eq("REF"))).thenReturn(List.of(holdTx));
+            when(transactionRepository.calculateNetHeldAmount(any(), eq("REF"))).thenReturn(holdTx.getAmount());
             when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             Wallet w = walletService.settlePayment(userId, new BigDecimal("50000"), "REF", "k1");
@@ -282,7 +371,7 @@ class WalletServiceTest {
             wallet.setBalanceLocked(new BigDecimal("30000"));
             Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("30000"), "REF");
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), eq("REF"))).thenReturn(List.of(holdTx));
+            when(transactionRepository.calculateNetHeldAmount(any(), eq("REF"))).thenReturn(holdTx.getAmount());
 
             assertThrows(InvalidAmountException.class,
                     () -> walletService.settlePayment(userId, new BigDecimal("50000"), "REF", "k1"));
@@ -291,10 +380,51 @@ class WalletServiceTest {
             wallet.setBalanceLocked(new BigDecimal("50000"));
             Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), "REF");
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdAndReferenceId(any(), eq("REF"))).thenReturn(List.of(holdTx));
+            when(transactionRepository.calculateNetHeldAmount(any(), eq("REF"))).thenReturn(holdTx.getAmount());
             when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             assertNotNull(walletService.settlePayment(userId, new BigDecimal("50000"), "REF"));
+        }
+
+        @Test void idempotent_skipsIfKeyExists() {
+            String key = "IDEMP-SETTLE";
+            when(transactionRepository.findByIdempotencyKey(key))
+                    .thenReturn(Optional.of(new Transaction()));
+            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+
+            Wallet w = walletService.settlePayment(userId, new BigDecimal("50000"), "REF", key);
+            assertEquals(wallet, w);
+            verify(walletRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any(Object.class));
+        }
+
+        @Test void calculateHeldWithVariousTransactionTypes() {
+            wallet.setBalanceLocked(new BigDecimal("100000"));
+            Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("100000"), "REF");
+            Transaction refundTx = new Transaction(wallet.getId(), TransactionType.REFUND, new BigDecimal("20000"), "REF");
+            Transaction paymentTx = new Transaction(wallet.getId(), TransactionType.PAYMENT, new BigDecimal("30000"), "REF");
+            Transaction topupTx = new Transaction(wallet.getId(), TransactionType.TOPUP, new BigDecimal("15000"), "REF");
+
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(transactionRepository.calculateNetHeldAmount(any(), eq("REF")))
+                    .thenReturn(new BigDecimal("50000"));
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            Wallet w = walletService.settlePayment(userId, new BigDecimal("50000"), "REF", "k1");
+            assertEquals(new BigDecimal("50000"), w.getBalanceLocked());
+        }
+
+        @Test void calculateHeldWithNegativeNetHeld_returnsZero() {
+            wallet.setBalanceLocked(new BigDecimal("100000"));
+            Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("10000"), "REF");
+            Transaction refundTx = new Transaction(wallet.getId(), TransactionType.REFUND, new BigDecimal("20000"), "REF");
+
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(transactionRepository.calculateNetHeldAmount(any(), eq("REF")))
+                    .thenReturn(new BigDecimal("-10000"));
+
+            assertThrows(InvalidAmountException.class,
+                    () -> walletService.settlePayment(userId, new BigDecimal("10000"), "REF", "k1"));
         }
     }
 
@@ -312,18 +442,37 @@ class WalletServiceTest {
             assertThrows(InvalidAmountException.class,
                     () -> walletService.confirmDelivery(userId, BigDecimal.ZERO, "REF", "k1"));
         }
+        @Test void overloadWithoutIdempotencyKey() {
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            Wallet w = walletService.confirmDelivery(userId, new BigDecimal("75000"), "REF");
+            assertEquals(new BigDecimal("75000"), w.getBalanceAvailable());
+        }
+
+        @Test void idempotent_skipsIfKeyExists() {
+            String key = "IDEMP-DELIVERY";
+            when(transactionRepository.findByIdempotencyKey(key))
+                    .thenReturn(Optional.of(new Transaction()));
+            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+
+            Wallet w = walletService.confirmDelivery(userId, new BigDecimal("75000"), "REF", key);
+            assertEquals(wallet, w);
+            verify(walletRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any(Object.class));
+        }
     }
 
     @Nested class TransactionHistory {
         @Test void success() {
             Transaction tx = new Transaction(wallet.getId(), TransactionType.TOPUP, new BigDecimal("50000"), "n");
-            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.findByWalletIdOrderByCreatedAtDesc(wallet.getId())).thenReturn(List.of(tx));
+            when(walletRepository.existsByUserId(userId)).thenReturn(true);
+            when(transactionRepository.findByUserId(userId)).thenReturn(List.of(tx));
 
             assertEquals(1, walletService.getTransactionHistory(userId).size());
         }
         @Test void walletNotFound_throws() {
-            when(walletRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(walletRepository.existsByUserId(userId)).thenReturn(false);
             assertThrows(WalletNotFoundException.class, () -> walletService.getTransactionHistory(userId));
         }
     }
@@ -333,14 +482,20 @@ class WalletServiceTest {
             UUID txId = UUID.randomUUID();
             Transaction tx = new Transaction(wallet.getId(), TransactionType.TOPUP, new BigDecimal("50000"), "n");
             tx.setId(txId);
-            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+            when(walletRepository.existsByUserId(userId)).thenReturn(true);
             when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
+            when(walletRepository.existsByIdAndUserId(wallet.getId(), userId)).thenReturn(true);
 
             assertEquals(txId, walletService.getTransactionById(txId, userId).getId());
         }
+        @Test void walletNotFound_throws() {
+            UUID txId = UUID.randomUUID();
+            when(walletRepository.existsByUserId(userId)).thenReturn(false);
+            assertThrows(WalletNotFoundException.class, () -> walletService.getTransactionById(txId, userId));
+        }
         @Test void notFound_throws() {
             UUID txId = UUID.randomUUID();
-            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+            when(walletRepository.existsByUserId(userId)).thenReturn(true);
             when(transactionRepository.findById(txId)).thenReturn(Optional.empty());
             assertThrows(InvalidRequestException.class, () -> walletService.getTransactionById(txId, userId));
         }
@@ -348,8 +503,9 @@ class WalletServiceTest {
             UUID txId = UUID.randomUUID();
             Transaction tx = new Transaction(UUID.randomUUID(), TransactionType.TOPUP, new BigDecimal("50000"), "n");
             tx.setId(txId);
-            when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+            when(walletRepository.existsByUserId(userId)).thenReturn(true);
             when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
+            when(walletRepository.existsByIdAndUserId(tx.getWalletId(), userId)).thenReturn(false);
             assertThrows(UnauthorizedException.class, () -> walletService.getTransactionById(txId, userId));
         }
     }
@@ -365,8 +521,8 @@ class WalletServiceTest {
 
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
             when(transactionRepository.findByWalletIdAndType(wallet.getId(), TransactionType.HOLD)).thenReturn(List.of(h1, h2));
-            when(transactionRepository.findByWalletIdAndReferenceId(wallet.getId(), listing1.toString())).thenReturn(List.of(h1));
-            when(transactionRepository.findByWalletIdAndReferenceId(wallet.getId(), listing2.toString())).thenReturn(List.of(h2));
+            when(transactionRepository.calculateNetHeldAmount(wallet.getId(), listing1.toString())).thenReturn(h1.getAmount());
+            when(transactionRepository.calculateNetHeldAmount(wallet.getId(), listing2.toString())).thenReturn(h2.getAmount());
             when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             walletService.releaseAllHoldsForUser(userId);
@@ -384,6 +540,32 @@ class WalletServiceTest {
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
             walletService.releaseAllHoldsForUser(userId);
             verify(transactionRepository, never()).findByWalletIdAndType(any(), any());
+        }
+        @Test void invalidUuidReference_catchesException() {
+            wallet.setBalanceLocked(new BigDecimal("50000"));
+            Transaction h1 = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), "NOT-A-UUID");
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(transactionRepository.findByWalletIdAndType(wallet.getId(), TransactionType.HOLD)).thenReturn(List.of(h1));
+            when(transactionRepository.calculateNetHeldAmount(wallet.getId(), "NOT-A-UUID")).thenReturn(h1.getAmount());
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            assertDoesNotThrow(() -> walletService.releaseAllHoldsForUser(userId));
+            verify(transactionRepository).save(argThat(tx -> tx.getType() == TransactionType.REFUND));
+        }
+
+        @Test void holdExistsButNetHeldIsZero_doesNotReleaseOrSave() {
+            wallet.setBalanceLocked(new BigDecimal("50000"));
+            Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), "REF");
+            Transaction refundTx = new Transaction(wallet.getId(), TransactionType.REFUND, new BigDecimal("50000"), "REF");
+
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(transactionRepository.findByWalletIdAndType(wallet.getId(), TransactionType.HOLD)).thenReturn(List.of(holdTx));
+            when(transactionRepository.calculateNetHeldAmount(wallet.getId(), "REF")).thenReturn(holdTx.getAmount().subtract(refundTx.getAmount()));
+
+            walletService.releaseAllHoldsForUser(userId);
+
+            verify(transactionRepository, never()).save(any());
+            verify(walletRepository, never()).save(any());
         }
     }
 }

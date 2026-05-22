@@ -1,6 +1,8 @@
 package com.example.bidmart.bidding.controller;
 
+import com.example.bidmart.bidding.dto.BidTooLowResponse;
 import com.example.bidmart.bidding.exception.BidConflictException;
+import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.exception.ErrorResponse;
@@ -23,6 +25,17 @@ public class BidControllerAdvice {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(BidTooLowException.class)
+    public ResponseEntity<BidTooLowResponse> handleBidTooLow(BidTooLowException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(new BidTooLowResponse(
+                        HttpStatus.UNPROCESSABLE_CONTENT.value(),
+                        "BID_TOO_LOW",
+                        ex.getMessage(),
+                        Instant.now().toString(),
+                        ex.getMinimumBid()));
     }
 
     @ExceptionHandler(BidValidationException.class)

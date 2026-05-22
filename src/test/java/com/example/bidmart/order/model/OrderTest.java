@@ -97,4 +97,40 @@ class OrderTest {
         assertNotNull(order.getCreatedAt());
         assertEquals(OrderStatus.CREATED, order.getStatus());
     }
+
+    @Test
+    void testPrePersistOnCreate_doesNotOverwriteExistingValues() {
+        Order order = new Order();
+        LocalDateTime existingTime = LocalDateTime.of(2025, 1, 1, 0, 0);
+        order.setCreatedAt(existingTime);
+        order.setStatus(OrderStatus.SHIPPED);
+
+        order.onCreate();
+
+        assertEquals(existingTime, order.getCreatedAt());
+        assertEquals(OrderStatus.SHIPPED, order.getStatus());
+    }
+
+    @Test
+    void testPrePersistOnCreate_setsOnlyMissingCreatedAt() {
+        Order order = new Order();
+        order.setStatus(OrderStatus.SHIPPED);
+
+        order.onCreate();
+
+        assertNotNull(order.getCreatedAt());
+        assertEquals(OrderStatus.SHIPPED, order.getStatus());
+    }
+
+    @Test
+    void testPrePersistOnCreate_setsOnlyMissingStatus() {
+        Order order = new Order();
+        LocalDateTime existingTime = LocalDateTime.of(2025, 1, 1, 0, 0);
+        order.setCreatedAt(existingTime);
+
+        order.onCreate();
+
+        assertEquals(existingTime, order.getCreatedAt());
+        assertEquals(OrderStatus.CREATED, order.getStatus());
+    }
 }

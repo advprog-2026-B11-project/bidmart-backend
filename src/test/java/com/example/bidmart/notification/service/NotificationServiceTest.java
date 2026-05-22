@@ -88,6 +88,18 @@ class NotificationServiceTest {
     }
 
     @Test
+    void createNotification_mutedTypesNull_doesNotBlockNotification() {
+        preference.setMutedTypes(null);
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+
+        Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
+
+        assertNotNull(result);
+        assertEquals("DELIVERED", result.getDeliveryStatus());
+    }
+
+    @Test
     void createNotification_pushThrowsException_deliveryStatusFailed() {
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
@@ -187,7 +199,7 @@ class NotificationServiceTest {
     void markAsRead_success() {
         when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
         when(notificationRepository.save(any(Notification.class))).thenReturn(notification);
-        Notification result = notificationService.markAsRead(notificationId);
+        Notification result = notificationService.markAsRead(notificationId, userId);
         assertTrue(result.isRead());
         verify(notificationRepository, times(1)).save(notification);
     }
@@ -197,7 +209,7 @@ class NotificationServiceTest {
         when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
 
         Exception exception = assertThrows(ResourceNotFoundException.class, () -> {
-            notificationService.markAsRead(notificationId);
+            notificationService.markAsRead(notificationId, userId);
         });
 
         assertTrue(exception.getMessage().toLowerCase().contains("tidak ditemukan"));
@@ -205,30 +217,78 @@ class NotificationServiceTest {
     }
 
     @Test
+    void markAsRead_differentUser_throwsAccessDeniedException() {
+        UUID otherUserId = UUID.randomUUID();
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.markAsRead(notificationId, otherUserId);
+        });
+    }
+
+    @Test
     void markAllAsRead_success() {
-        Notification notif2 = new Notification(userId, "TYPE_2", "Message 2");
-        List<Notification> unreadList = Arrays.asList(notification, notif2);
-        when(notificationRepository.findByUserIdAndIsReadFalse(userId)).thenReturn(unreadList);
-
         notificationService.markAllAsRead(userId);
-
-        assertTrue(notification.isRead());
-        assertTrue(notif2.isRead());
-        verify(notificationRepository, times(1)).saveAll(unreadList);
+        verify(notificationRepository, times(1)).markAllAsReadByUserId(userId);
     }
 
     @Test
     void deleteNotification_success() {
-        doNothing().when(notificationRepository).deleteById(notificationId);
+        doNothing().when(notificationRepository).delete(notification);
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
 
-        notificationService.deleteNotification(notificationId);
+        notificationService.deleteNotification(notificationId, userId);
 
-        verify(notificationRepository, times(1)).deleteById(notificationId);
+        verify(notificationRepository, times(1)).delete(notification);
+    }
+
+    @Test
+    void markAsRead_wrongUser_throwsException() {
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+        
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.markAsRead(notificationId, UUID.randomUUID());
+        });
+        
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void deleteNotification_wrongUser_throwsException() {
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+        
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.deleteNotification(notificationId, UUID.randomUUID());
+        });
+        
+        verify(notificationRepository, never()).delete(any(Notification.class));
     }
 
     @Test
     void deleteNotification_notFound_throwsException() {
-        assertDoesNotThrow(() -> notificationService.deleteNotification(notificationId));
-        verify(notificationRepository, times(1)).deleteById(notificationId);
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> notificationService.deleteNotification(notificationId, userId));
+        verify(notificationRepository, never()).delete(any(Notification.class));
+    }
+
+    @Test
+    void deleteNotification_differentUser_throwsAccessDeniedException() {
+        UUID otherUserId = UUID.randomUUID();
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.deleteNotification(notificationId, otherUserId);
+        });
+    }
+
+    @Test
+    void updatePreference_withNullMutedTypes_doesNotSetMutedTypes() {
+        when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
+        when(preferenceRepository.save(any(NotificationPreference.class))).thenReturn(preference);
+
+        NotificationPreference result = notificationService.updatePreference(userId, false, false, false, null);
+
+        assertNotNull(result);
+        verify(preferenceRepository).save(preference);
     }
 }

@@ -43,13 +43,14 @@ public class OrderService {
         return orderRepository.save(newOrder);
     }
 
-    public List<Order> getOrdersByBuyer(UUID buyerId) {
-        return orderRepository.findByBuyerId(buyerId);
+    public List<Order> getOrdersByUser(UUID userId) {
+        return orderRepository.findByBuyerIdOrSellerId(userId, userId);
     }
 
     @Transactional
     public Order updateOrderStatus(UUID orderId, String newStatusStr) {
         Order order = getOrderOrThrow(orderId);
+        OrderStatus previousStatus = order.getStatus();
         OrderStatus newStatus = OrderStatus.fromString(newStatusStr);
         
         if (!order.getStatus().canTransitionTo(newStatus)) {
@@ -57,7 +58,13 @@ public class OrderService {
         }
         
         order.setStatus(newStatus);
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+
+        if (previousStatus != newStatus) {
+            publishWalletEventForStatus(savedOrder, newStatus);
+        }
+
+        return savedOrder;
     }
 
     @Transactional
@@ -94,6 +101,7 @@ public class OrderService {
 
         eventPublisher.publishEvent(new OrderDeliveredEvent(
                 savedOrder.getId(),
+                savedOrder.getListingId(),
                 savedOrder.getBuyerId(),
                 savedOrder.getSellerId(),
                 savedOrder.getAmount()
@@ -129,7 +137,7 @@ public class OrderService {
             }
             order.setStatus(OrderStatus.CANCELLED);
             eventPublisher.publishEvent(new OrderRefundedEvent(
-                order.getId(), order.getBuyerId(), order.getAmount()
+                order.getId(), order.getListingId(), order.getBuyerId(), order.getAmount()
             ));
         } else {
             if (!order.getStatus().canTransitionTo(OrderStatus.DELIVERED)) {
@@ -137,7 +145,7 @@ public class OrderService {
             }
             order.setStatus(OrderStatus.DELIVERED);
             eventPublisher.publishEvent(new OrderDeliveredEvent(
-                order.getId(), order.getBuyerId(), order.getSellerId(), order.getAmount()
+                order.getId(), order.getListingId(), order.getBuyerId(), order.getSellerId(), order.getAmount()
             ));
         }
         
@@ -155,5 +163,24 @@ public class OrderService {
     private Order getOrderOrThrow(UUID orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Pesanan tidak ditemukan dengan ID: " + orderId));
+    }
+
+    private void publishWalletEventForStatus(Order order, OrderStatus status) {
+        if (status == OrderStatus.DELIVERED) {
+            eventPublisher.publishEvent(new OrderDeliveredEvent(
+                    order.getId(),
+                    order.getListingId(),
+                    order.getBuyerId(),
+                    order.getSellerId(),
+                    order.getAmount()
+            ));
+        } else if (status == OrderStatus.CANCELLED) {
+            eventPublisher.publishEvent(new OrderRefundedEvent(
+                    order.getId(),
+                    order.getListingId(),
+                    order.getBuyerId(),
+                    order.getAmount()
+            ));
+        }
     }
 }

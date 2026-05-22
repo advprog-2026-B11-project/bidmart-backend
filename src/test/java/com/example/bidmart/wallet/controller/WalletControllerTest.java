@@ -6,6 +6,7 @@ import com.example.bidmart.wallet.dto.*;
 import com.example.bidmart.wallet.exception.*;
 import com.example.bidmart.wallet.model.PaymentMethod;
 import com.example.bidmart.wallet.model.Transaction;
+import com.example.bidmart.wallet.model.TransactionType;
 import com.example.bidmart.wallet.model.Wallet;
 import com.example.bidmart.wallet.service.WalletService;
 
@@ -370,5 +371,121 @@ class WalletControllerTest {
                 UUID.randomUUID(), new BigDecimal("30000"), listingId, idempotencyKey);
 
         assertThrows(WalletNotFoundException.class, () -> walletController.confirmDelivery(request));
+    }
+
+    // === getTransactionDetail ===
+
+    @Test
+    void getTransactionDetail_success() {
+        UUID txId = UUID.randomUUID();
+        Transaction tx = new Transaction();
+        tx.setId(txId);
+        tx.setAmount(new BigDecimal("1000"));
+        tx.setType(TransactionType.TOPUP);
+        tx.setReferenceId("REF");
+
+        when(walletService.getTransactionById(txId, userId)).thenReturn(tx);
+
+        ResponseEntity<TransactionResponse> response = walletController.getTransactionDetail(txId, authentication);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(txId, response.getBody().getId());
+    }
+
+    // === resolveCurrentUserId Exception cases ===
+
+    @Test
+    void getBalance_userNotFound_throwsUnauthorized() {
+        when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
+        assertThrows(UnauthorizedException.class, () -> walletController.getBalance(authentication));
+    }
+
+    @Test
+    void getBalance_nullAuthentication_throwsUnauthorized() {
+        assertThrows(UnauthorizedException.class, () -> walletController.getBalance((Authentication) null));
+    }
+
+    @Test
+    void getBalance_notAuthenticated_throwsUnauthorized() {
+        Authentication notAuth = mock(Authentication.class);
+        when(notAuth.isAuthenticated()).thenReturn(false);
+        assertThrows(UnauthorizedException.class, () -> walletController.getBalance(notAuth));
+    }
+
+    // === Validation Tests (InvalidRequestException) ===
+
+    @Test
+    void holdBalance_nullAmount_throwsInvalidRequest() {
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(null);
+        request.setListingId(listingId);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.holdBalance(request));
+    }
+
+    @Test
+    void holdBalance_nullListingId_throwsInvalidRequest() {
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(new BigDecimal("100"));
+        request.setListingId(null);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.holdBalance(request));
+    }
+
+    @Test
+    void releaseHold_nullAmount_throwsInvalidRequest() {
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(null);
+        request.setListingId(listingId);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.releaseHold(request));
+    }
+
+    @Test
+    void releaseHold_nullListingId_throwsInvalidRequest() {
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(new BigDecimal("100"));
+        request.setListingId(null);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.releaseHold(request));
+    }
+
+    @Test
+    void settlePayment_nullAmount_throwsInvalidRequest() {
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(null);
+        request.setListingId(listingId);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.settlePayment(request));
+    }
+
+    @Test
+    void settlePayment_nullListingId_throwsInvalidRequest() {
+        HoldBalanceRequest request = new HoldBalanceRequest();
+        request.setBuyerId(userId);
+        request.setAmount(new BigDecimal("100"));
+        request.setListingId(null);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.settlePayment(request));
+    }
+
+    @Test
+    void confirmDelivery_nullSellerId_throwsInvalidRequest() {
+        ConfirmDeliveryRequest request = new ConfirmDeliveryRequest(null, new BigDecimal("100"), listingId, idempotencyKey);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.confirmDelivery(request));
+    }
+
+    @Test
+    void confirmDelivery_nullAmount_throwsInvalidRequest() {
+        ConfirmDeliveryRequest request = new ConfirmDeliveryRequest(UUID.randomUUID(), null, listingId, idempotencyKey);
+
+        assertThrows(InvalidRequestException.class, () -> walletController.confirmDelivery(request));
     }
 }

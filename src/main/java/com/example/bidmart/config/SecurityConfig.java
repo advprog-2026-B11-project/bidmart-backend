@@ -57,8 +57,11 @@ public class SecurityConfig {
                 ).hasRole("INTERNAL_SERVICE")
 
                 .requestMatchers("/api/wallet/**").authenticated()
-                .requestMatchers("/listings/**").authenticated()
-                .requestMatchers("/api/bids/**").authenticated()
+                
+                .requestMatchers("/api/listings/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                .requestMatchers("/api/bids/mocks/**").permitAll()
+                .requestMatchers("/api/bids/**").permitAll()
                 .requestMatchers("/api/orders/**").authenticated()
                 .requestMatchers("/api/notifications/**").permitAll()
 

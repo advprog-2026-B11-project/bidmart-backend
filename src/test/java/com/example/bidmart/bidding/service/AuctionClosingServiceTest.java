@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -161,5 +162,75 @@ class AuctionClosingServiceTest {
         verify(walletService).releaseBidFunds(eq(loser1Id), eq(listingId), eq(loser1Bid));
         verify(walletService).releaseBidFunds(eq(loser2Id), eq(listingId), eq(loser2Bid));
         verify(eventPublisher).publishEvent(any(AuctionWonEvent.class));
+    }
+
+    @Test
+    void closeAuction_releaseAllHoldsFails_continuesForOtherBidders() {
+        UUID listingId  = UUID.randomUUID();
+        UUID buyer1Id   = UUID.randomUUID();
+        UUID buyer2Id   = UUID.randomUUID();
+        BigDecimal buyer1Bid = new BigDecimal("300000");
+        BigDecimal buyer2Bid = new BigDecimal("200000");
+
+        Listing listing = activeListing(listingId, null, buyer1Id, new BigDecimal("999999"));
+
+        when(bidRepository.findByListingIdOrderByCreatedAtDesc(listingId))
+                .thenReturn(List.of(
+                        makeBid(listingId, buyer1Id, buyer1Bid),
+                        makeBid(listingId, buyer2Id, buyer2Bid)
+                ));
+        doThrow(new RuntimeException("Wallet error"))
+                .when(walletService).releaseBidFunds(eq(buyer1Id), any(), any());
+
+        auctionClosingService.closeAuction(listing);
+
+        assertThat(listing.getStatus()).isEqualTo(AuctionStatus.UNSOLD);
+        verify(walletService).releaseBidFunds(eq(buyer1Id), eq(listingId), eq(buyer1Bid));
+        verify(walletService).releaseBidFunds(eq(buyer2Id), eq(listingId), eq(buyer2Bid));
+        verify(eventPublisher).publishEvent(any(AuctionClosedNoWinnerEvent.class));
+    }
+
+    @Test
+    void closeAuction_duplicateBiddersInLoserList_processedOnlyOnce() {
+        UUID listingId = UUID.randomUUID();
+        UUID winnerId  = UUID.randomUUID();
+        UUID loserId   = UUID.randomUUID();
+        BigDecimal winningBid = new BigDecimal("500000");
+        BigDecimal loserBid1  = new BigDecimal("400000");
+        BigDecimal loserBid2  = new BigDecimal("300000");
+
+        Listing listing = activeListing(listingId, winningBid, winnerId, new BigDecimal("100000"));
+
+        when(bidRepository.findByListingIdOrderByCreatedAtDesc(listingId))
+                .thenReturn(List.of(
+                        makeBid(listingId, winnerId, winningBid),
+                        makeBid(listingId, loserId, loserBid1),
+                        makeBid(listingId, loserId, loserBid2)
+                ));
+
+        auctionClosingService.closeAuction(listing);
+
+        verify(walletService, times(1)).releaseBidFunds(eq(loserId), eq(listingId), eq(loserBid1));
+        verify(walletService, never()).releaseBidFunds(eq(loserId), eq(listingId), eq(loserBid2));
+    }
+
+    @Test
+    void closeAuction_duplicateBiddersInUnsold_processedOnlyOnce() {
+        UUID listingId = UUID.randomUUID();
+        UUID buyerId   = UUID.randomUUID();
+        BigDecimal bid1 = new BigDecimal("300000");
+        BigDecimal bid2 = new BigDecimal("200000");
+
+        Listing listing = activeListing(listingId, null, null, null);
+
+        when(bidRepository.findByListingIdOrderByCreatedAtDesc(listingId))
+                .thenReturn(List.of(
+                        makeBid(listingId, buyerId, bid1),
+                        makeBid(listingId, buyerId, bid2)
+                ));
+
+        auctionClosingService.closeAuction(listing);
+
+        verify(walletService, times(1)).releaseBidFunds(eq(buyerId), eq(listingId), eq(bid1));
     }
 }

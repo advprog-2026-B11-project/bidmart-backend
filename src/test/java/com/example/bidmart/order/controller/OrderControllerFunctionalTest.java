@@ -72,9 +72,9 @@ class OrderControllerFunctionalTest {
 
     @Test
     void testGetOrdersByBuyer_ShouldReturnList() throws Exception {
-        when(orderService.getOrdersByBuyer(buyerId)).thenReturn(List.of(order));
+        when(orderService.getOrdersByUser(buyerId)).thenReturn(List.of(order));
 
-        mockMvc.perform(get("/api/orders/buyer/{buyerId}", buyerId)
+        mockMvc.perform(get("/api/orders/user/{userId}", buyerId)
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(orderId.toString()))

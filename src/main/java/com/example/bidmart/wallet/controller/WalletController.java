@@ -50,7 +50,7 @@ public class WalletController {
     @GetMapping("/{userId}/balance")
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_READ)")
     public ResponseEntity<Wallet> getBalance(
-            @PathVariable UUID userId,
+            @PathVariable("userId") UUID userId,
             Authentication authentication
     ) {
         ensureCurrentUser(userId, authentication);
@@ -60,11 +60,13 @@ public class WalletController {
     @PostMapping("/{userId}/top-up")
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_TOP_UP)")
     public ResponseEntity<WalletResponse> topUp(
-            @PathVariable UUID userId,
+            @PathVariable(name = "userId", required = false) UUID userId,
             @RequestBody TopUpRequest request,
             Authentication authentication
     ) {
-        ensureCurrentUser(userId, authentication);
+        if (userId != null) {
+            ensureCurrentUser(userId, authentication);
+        }
         UUID authenticatedUserId = resolveCurrentUserId(authentication);
         Wallet wallet = walletService.topUp(authenticatedUserId, request);
 
@@ -166,7 +168,7 @@ public class WalletController {
     @GetMapping("/transactions/{transactionId}")
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_TRANSACTIONS_READ)")
     public ResponseEntity<TransactionResponse> getTransactionDetail(
-            @PathVariable UUID transactionId,
+            @PathVariable("transactionId") UUID transactionId,
             Authentication authentication
     ) {
         UUID userId = resolveCurrentUserId(authentication);

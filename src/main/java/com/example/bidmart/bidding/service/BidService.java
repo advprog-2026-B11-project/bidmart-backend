@@ -3,6 +3,7 @@ package com.example.bidmart.bidding.service;
 import com.example.bidmart.bidding.dto.BidResponse;
 import com.example.bidmart.bidding.dto.CreateBidRequest;
 import com.example.bidmart.bidding.exception.BidConflictException;
+import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.bidding.model.Bid;
@@ -79,7 +80,8 @@ public class BidService {
 
         ValidationResult strategyResult = strategy.validateBid(request.amount(), listing);
         if (!strategyResult.valid()) {
-            throw new BidValidationException(strategyResult.errorMessage());
+            throw new BidTooLowException(strategyResult.errorMessage(),
+                    strategy.computeMinimumNextBid(listing));
         }
 
         boolean proxyBid = Boolean.TRUE.equals(request.proxyBid());

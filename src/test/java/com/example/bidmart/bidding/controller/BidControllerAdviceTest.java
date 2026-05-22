@@ -1,6 +1,8 @@
 package com.example.bidmart.bidding.controller;
 
+import com.example.bidmart.bidding.dto.BidTooLowResponse;
 import com.example.bidmart.bidding.exception.BidConflictException;
+import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.exception.ErrorResponse;
@@ -9,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,5 +61,19 @@ class BidControllerAdviceTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getBody().status()).isEqualTo(403);
         assertThat(response.getBody().error()).isEqualTo("FORBIDDEN");
+    }
+
+    @Test
+    void handleBidTooLow_returns422WithMinimumBid() {
+        BigDecimal minimumBid = new BigDecimal("101.00");
+        BidTooLowException ex = new BidTooLowException("Bid harus lebih tinggi.", minimumBid);
+
+        ResponseEntity<BidTooLowResponse> response = advice.handleBidTooLow(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody().status()).isEqualTo(422);
+        assertThat(response.getBody().error()).isEqualTo("BID_TOO_LOW");
+        assertThat(response.getBody().message()).isEqualTo("Bid harus lebih tinggi.");
+        assertThat(response.getBody().minimumBid()).isEqualByComparingTo(minimumBid);
     }
 }
