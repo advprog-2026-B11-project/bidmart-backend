@@ -25,8 +25,8 @@ public class RoleController {
     @PostMapping("/{roleName}/permissions/{permissionName}")
     @Transactional
     public ResponseEntity<String> assignPermission(
-            @PathVariable String roleName, 
-            @PathVariable String permissionName) {
+            @PathVariable("roleName") String roleName,
+            @PathVariable("permissionName") String permissionName) {
         
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new IllegalArgumentException("The role was not found"));
@@ -52,8 +52,8 @@ public class RoleController {
     @DeleteMapping("/{roleName}/permissions/{permissionName}")
     @Transactional
     public ResponseEntity<String> revokePermission(
-            @PathVariable String roleName, 
-            @PathVariable String permissionName) {
+            @PathVariable("roleName") String roleName,
+            @PathVariable("permissionName") String permissionName) {
         
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new IllegalArgumentException("The role was not found"));

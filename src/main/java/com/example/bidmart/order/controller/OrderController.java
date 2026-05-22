@@ -41,7 +41,7 @@ public class OrderController {
     @GetMapping("/buyer/{buyerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<Order>> getOrdersByBuyer(
-            @PathVariable UUID buyerId,
+            @PathVariable("buyerId") UUID buyerId,
             Authentication authentication) {
         
         UUID authenticatedUserId = resolveCurrentUserId(authentication);
@@ -56,7 +56,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/tracking")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> updateTrackingNumber(
-            @PathVariable UUID orderId,
+            @PathVariable("orderId") UUID orderId,
             @Valid @RequestBody UpdateTrackingRequest request,
             Authentication authentication) {
 
@@ -68,7 +68,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/confirm")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> confirmDelivery(
-            @PathVariable UUID orderId,
+            @PathVariable("orderId") UUID orderId,
             Authentication authentication) {
 
         UUID requesterId = resolveCurrentUserId(authentication);
@@ -79,7 +79,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/dispute")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> disputeOrder(
-            @PathVariable UUID orderId,
+            @PathVariable("orderId") UUID orderId,
             @Valid @RequestBody DisputeRequest request,
             Authentication authentication) {
 
@@ -91,7 +91,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/resolve-dispute")
     @PreAuthorize("hasAuthority('SCOPE_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<Order> resolveDispute(
-            @PathVariable UUID orderId,
+            @PathVariable("orderId") UUID orderId,
             @Valid @RequestBody ResolveDisputeRequest request) {
 
         Order updatedOrder = orderService.resolveDispute(orderId, request.getRefundBuyer());
@@ -101,7 +101,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/status")
     @PreAuthorize("hasAuthority('SCOPE_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<Order> updateOrderStatus(
-            @PathVariable UUID orderId,
+            @PathVariable("orderId") UUID orderId,
             @Valid @RequestBody UpdateOrderStatusRequest request) {
 
         Order updatedOrder = orderService.updateOrderStatus(orderId, request.getStatus());
@@ -122,7 +122,7 @@ public class OrderController {
 
     @DeleteMapping("/{orderId}")
     @PreAuthorize("hasAuthority('SCOPE_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<Map<String, String>> deleteOrder(@PathVariable UUID orderId) {
+    public ResponseEntity<Map<String, String>> deleteOrder(@PathVariable("orderId") UUID orderId) {
         orderService.deleteOrder(orderId);
         return ResponseEntity.ok(Map.of("message", "Pesanan berhasil dihapus"));
     }

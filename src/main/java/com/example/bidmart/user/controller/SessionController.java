@@ -25,7 +25,7 @@ public class SessionController {
     }
 
     @DeleteMapping("/{sessionId}")
-    public ResponseEntity<Void> revokeSession(@PathVariable UUID sessionId, Authentication authentication){
+    public ResponseEntity<Void> revokeSession(@PathVariable("sessionId") UUID sessionId, Authentication authentication){
         sessionService.revokeSession(authentication.getName(), sessionId);
         return ResponseEntity.noContent().build();
     }

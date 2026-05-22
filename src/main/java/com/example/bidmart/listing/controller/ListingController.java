@@ -48,8 +48,8 @@ public class ListingController {
 
     @GetMapping
     public ResponseEntity<PaginatedResponse<ListingResponse>> getAllListings(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(PaginatedResponse.from(
                 listingService.getAllListings(createPageable(page, size))
                         .map(ListingResponse::from)));
@@ -57,8 +57,8 @@ public class ListingController {
 
     @GetMapping("/active")
     public ResponseEntity<PaginatedResponse<ListingResponse>> getActiveListings(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(PaginatedResponse.from(
                 listingService.getActiveListings(createPageable(page, size))
                         .map(ListingResponse::from)));
@@ -66,19 +66,19 @@ public class ListingController {
 
     @GetMapping("/search")
     public ResponseEntity<PaginatedResponse<ListingResponse>> searchListings(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "keyword", required = false) String keyword,
+            @RequestParam(name = "category", required = false) String category,
+            @RequestParam(name = "minPrice", required = false) BigDecimal minPrice,
+            @RequestParam(name = "maxPrice", required = false) BigDecimal maxPrice,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(PaginatedResponse.from(
                 listingService.searchListings(keyword, category, minPrice, maxPrice, createPageable(page, size))
                         .map(ListingResponse::from)));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ListingResponse> getListingById(@PathVariable UUID id) {
+    public ResponseEntity<ListingResponse> getListingById(@PathVariable("id") UUID id) {
         return listingService.getListingById(id)
                 .map(ListingResponse::from)
                 .map(ResponseEntity::ok)
@@ -88,7 +88,7 @@ public class ListingController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateListing(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Validated({Default.class, OnCreate.class}) @RequestBody CreateListingRequest request,
             Authentication authentication) {
         UUID requesterId = resolveCurrentUserId(authentication);
@@ -103,7 +103,7 @@ public class ListingController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteListing(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             Authentication authentication) {
         UUID requesterId = resolveCurrentUserId(authentication);
         try {

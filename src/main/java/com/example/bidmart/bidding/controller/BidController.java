@@ -41,17 +41,17 @@ public class BidController {
     }
 
     @GetMapping("/listing/{listingId}")
-    public List<BidResponse> getBidsByListing(@PathVariable UUID listingId) {
+    public List<BidResponse> getBidsByListing(@PathVariable("listingId") UUID listingId) {
         return bidService.getBidsByListing(listingId);
     }
 
     @GetMapping("/listing/{listingId}/highest")
-    public BidResponse getHighestBid(@PathVariable UUID listingId) {
+    public BidResponse getHighestBid(@PathVariable("listingId") UUID listingId) {
         return bidService.getHighestBid(listingId);
     }
 
     @GetMapping("/listing/{listingId}/minimum-bid")
-    public ResponseEntity<BigDecimal> getMinimumNextBid(@PathVariable UUID listingId) {
+    public ResponseEntity<BigDecimal> getMinimumNextBid(@PathVariable("listingId") UUID listingId) {
         return ResponseEntity.ok(bidService.getMinimumNextBid(listingId));
     }
 
@@ -63,7 +63,7 @@ public class BidController {
 
     @GetMapping("/buyer/{buyerId}")
     public List<BidResponse> getBidsByBuyer(
-            @PathVariable UUID buyerId,
+            @PathVariable("buyerId") UUID buyerId,
             Authentication authentication
     ) {
         UUID authenticatedUserId = resolveCurrentUserId(authentication);

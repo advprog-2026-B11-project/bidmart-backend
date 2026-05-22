@@ -42,7 +42,7 @@ public class NotificationController {
     @GetMapping("/user/{userId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<Notification>> getUserNotifications(
-            @PathVariable UUID userId,
+            @PathVariable("userId") UUID userId,
             Authentication authentication) {
         ensureCurrentUser(userId, authentication);
         return ResponseEntity.ok(notificationService.getUserNotifications(userId));
@@ -51,7 +51,7 @@ public class NotificationController {
     @GetMapping("/user/{userId}/unread")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<Notification>> getUnreadNotifications(
-            @PathVariable UUID userId,
+            @PathVariable("userId") UUID userId,
             Authentication authentication) {
         ensureCurrentUser(userId, authentication);
         return ResponseEntity.ok(notificationService.getUnreadNotifications(userId));
@@ -59,7 +59,7 @@ public class NotificationController {
 
     @PatchMapping("/{notificationId}/read")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Notification> markAsRead(@PathVariable UUID notificationId, Authentication authentication) {
+    public ResponseEntity<Notification> markAsRead(@PathVariable("notificationId") UUID notificationId, Authentication authentication) {
         UUID userId = getAuthenticatedUserId(authentication);
         return ResponseEntity.ok(notificationService.markAsRead(notificationId, userId));
     }
@@ -67,7 +67,7 @@ public class NotificationController {
     @PatchMapping("/user/{userId}/read-all")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, String>> markAllAsRead(
-            @PathVariable UUID userId,
+            @PathVariable("userId") UUID userId,
             Authentication authentication) {
         ensureCurrentUser(userId, authentication);
         notificationService.markAllAsRead(userId);
@@ -76,7 +76,7 @@ public class NotificationController {
 
     @DeleteMapping("/{notificationId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, String>> deleteNotification(@PathVariable UUID notificationId, Authentication authentication) {
+    public ResponseEntity<Map<String, String>> deleteNotification(@PathVariable("notificationId") UUID notificationId, Authentication authentication) {
         UUID userId = getAuthenticatedUserId(authentication);
         notificationService.deleteNotification(notificationId, userId);
         return ResponseEntity.ok(Map.of("message", "Notifikasi berhasil dihapus"));
@@ -85,7 +85,7 @@ public class NotificationController {
     @GetMapping("/user/{userId}/preferences")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<NotificationPreference> getPreferences(
-            @PathVariable UUID userId,
+            @PathVariable("userId") UUID userId,
             Authentication authentication) {
         ensureCurrentUser(userId, authentication);
         return ResponseEntity.ok(notificationService.getPreference(userId));
@@ -94,7 +94,7 @@ public class NotificationController {
     @PutMapping("/user/{userId}/preferences")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<NotificationPreference> updatePreferences(
-            @PathVariable UUID userId,
+            @PathVariable("userId") UUID userId,
             @RequestBody NotificationPreferenceRequest request,
             Authentication authentication) {
         ensureCurrentUser(userId, authentication);
