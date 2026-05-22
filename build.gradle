@@ -63,16 +63,17 @@ tasks.named('test') {
     finalizedBy jacocoTestReport
 }
 
-task functionalTest(type: Test) {
-    group = 'verification'
-    include '**/*FunctionalTest.class'
-    useJUnitPlatform()
-    finalizedBy jacocoTestReport
-}
-
 tasks.named('jacocoTestReport') {
     dependsOn test
     executionData fileTree(layout.buildDirectory.get()).include("jacoco/*.exec")
+    classDirectories.setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it, exclude: [
+            '**/config/**',
+            '**/*Seeder.class',
+            '**/exception/**ExceptionHandler.class',
+            '**/*Application.class'
+        ])
+    }))
     reports {
         xml.required = true
         html.required = true
