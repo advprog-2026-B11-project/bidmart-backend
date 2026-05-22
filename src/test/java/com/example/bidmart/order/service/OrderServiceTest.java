@@ -70,8 +70,8 @@ class OrderServiceTest {
 
     @Test
     void getOrdersByBuyer_success() {
-        when(orderRepository.findByBuyerId(buyerId)).thenReturn(Arrays.asList(order));
-        List<Order> result = orderService.getOrdersByBuyer(buyerId);
+        when(orderRepository.findByBuyerIdOrSellerId(buyerId, buyerId)).thenReturn(Arrays.asList(order));
+        List<Order> result = orderService.getOrdersByUser(buyerId);
         assertEquals(1, result.size());
     }
 
