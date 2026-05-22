@@ -174,6 +174,42 @@ class ListingServiceTest {
     }
 
     @Test
+    void updateListing_shouldDefaultAuctionTypeToEnglish_whenNull() {
+        listing.setStatus(AuctionStatus.CLOSED);
+        CreateListingRequest request = request(UUID.randomUUID(), "Title", new BigDecimal("100"), null, null);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Listing result = listingService.updateListing(listingId, request, sellerId, false);
+        assertEquals(AuctionType.ENGLISH, result.getAuctionType());
+    }
+
+    @Test
+    void updateListing_shouldFail_whenReservePriceLowerThanStartingPrice() {
+        listing.setStatus(AuctionStatus.CLOSED);
+        CreateListingRequest request = request(UUID.randomUUID(), "Title", new BigDecimal("100"), new BigDecimal("50"), AuctionType.ENGLISH);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+
+        assertThrows(IllegalArgumentException.class, () -> listingService.updateListing(listingId, request, sellerId, false));
+    }
+
+    @Test
+    void updateListing_nullStatus_doesNotBlockUpdate() {
+        listing.setStatus(null);
+        when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Listing result = listingService.updateListing(listingId, validRequest(), sellerId, false);
+        assertEquals("Updated Title", result.getTitle());
+    }
+
+    @Test
+    void deleteListing_shouldFail_whenNotFound() {
+        when(listingRepository.findById(listingId)).thenReturn(Optional.empty());
+        assertThrows(RuntimeException.class, () -> listingService.deleteListing(listingId, sellerId, false));
+    }
+
+    @Test
     void updateListing_shouldSucceedForAdminEvenWhenNotOwner() {
         listing.setStatus(AuctionStatus.CLOSED);
         when(listingRepository.findById(listingId)).thenReturn(Optional.of(listing));
@@ -223,6 +259,95 @@ class ListingServiceTest {
     void searchListings_shouldValidateInvalidPriceRange() {
         assertThrows(IllegalArgumentException.class,
                 () -> listingService.searchListings(null, null, new BigDecimal("200000"), new BigDecimal("100000")));
+    }
+
+    @Test
+    void searchListings_shouldFail_whenMinPriceNegative() {
+        assertThrows(IllegalArgumentException.class,
+                () -> listingService.searchListings(null, null, new BigDecimal("-10"), new BigDecimal("100")));
+    }
+
+    @Test
+    void searchListings_shouldFail_whenMaxPriceNegative() {
+        assertThrows(IllegalArgumentException.class,
+                () -> listingService.searchListings(null, null, null, new BigDecimal("-100")));
+    }
+
+    @Test
+    void searchListings_withBlankKeyword_shouldNormalizeToNull() {
+        when(listingRepository.findBySearchCriteria(null, null, null, null)).thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings("   ", null, null, null);
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findBySearchCriteria(null, null, null, null);
+    }
+
+    @Test
+    void searchListings_withNullKeyword_shouldPassNull() {
+        when(listingRepository.findBySearchCriteria(null, null, null, null)).thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings(null, null, null, null);
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findBySearchCriteria(null, null, null, null);
+    }
+
+    @Test
+    void searchListings_withInvalidCategoryId_shouldParseAsNull() {
+        when(listingRepository.findBySearchCriteria("test", null, null, null)).thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings("test", "not-a-uuid", null, null);
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findBySearchCriteria("test", null, null, null);
+    }
+
+    @Test
+    void searchListings_withEmptyCategory_shouldParseAsNull() {
+        when(listingRepository.findBySearchCriteria("test", null, null, null)).thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings("test", "", null, null);
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findBySearchCriteria("test", null, null, null);
+    }
+
+    @Test
+    void searchListings_withNullCategory_shouldParseAsNull() {
+        when(listingRepository.findBySearchCriteria("test", null, null, null)).thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings("test", null, null, null);
+
+        assertEquals(1, result.size());
+        verify(listingRepository).findBySearchCriteria("test", null, null, null);
+    }
+
+    @Test
+    void searchListings_validPriceRange_shouldSucceed() {
+        when(listingRepository.findBySearchCriteria(null, null, new BigDecimal("100"), new BigDecimal("500"))).thenReturn(List.of(listing));
+
+        List<Listing> result = listingService.searchListings(null, null, new BigDecimal("100"), new BigDecimal("500"));
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void createListing_reservePriceNull_shouldSucceed() {
+        CreateListingRequest request = request(UUID.randomUUID(), "Listing", new BigDecimal("100"), null, AuctionType.ENGLISH);
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Listing result = listingService.createListing(request, sellerId);
+        assertNotNull(result);
+    }
+
+    @Test
+    void createListing_startingPriceNull_shouldSucceed() {
+        CreateListingRequest request = request(UUID.randomUUID(), "Listing", null, null, AuctionType.ENGLISH);
+        when(listingRepository.save(any(Listing.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Listing result = listingService.createListing(request, sellerId);
+        assertNotNull(result);
     }
 
     @Test

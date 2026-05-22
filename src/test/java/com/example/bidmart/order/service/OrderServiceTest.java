@@ -212,6 +212,16 @@ class OrderServiceTest {
     }
 
     @Test
+    void resolveDispute_invalidTransitionForSeller_throwsException() {
+        order.setStatus(OrderStatus.CREATED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThrows(InvalidOrderStatusTransitionException.class, () -> {
+            orderService.resolveDispute(orderId, false);
+        });
+    }
+
+    @Test
     void deleteOrder_success() {
         when(orderRepository.existsById(orderId)).thenReturn(true);
         doNothing().when(orderRepository).deleteById(orderId);
@@ -219,6 +229,18 @@ class OrderServiceTest {
         orderService.deleteOrder(orderId);
         
         verify(orderRepository, times(1)).deleteById(orderId);
+    }
+
+    @Test
+    void updateOrderStatus_toShipped_doesNotPublishWalletEvent() {
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        Order result = orderService.updateOrderStatus(orderId, "SHIPPED");
+
+        assertEquals(OrderStatus.SHIPPED, result.getStatus());
+        verify(eventPublisher, never()).publishEvent(any(OrderDeliveredEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(OrderRefundedEvent.class));
     }
     
     @Test
