@@ -1,6 +1,7 @@
 package com.example.bidmart.bidding.validator;
 
 import com.example.bidmart.bidding.dto.CreateBidRequest;
+import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
 import com.example.bidmart.bidding.model.Bid;
 import com.example.bidmart.bidding.service.ListingSnapshot;
@@ -86,15 +87,18 @@ public class StandardBidValidatorImpl implements BidRuleValidator {
                 ? BigDecimal.ZERO
                 : listing.startingPrice();
 
-        if (bidAmount.compareTo(startingPrice) < 0) {
-            throw new BidValidationException(
-                    "Bid harus lebih besar atau sama dengan starting price " + startingPrice + ".");
-        }
-
-        if (currentHighestBid.isPresent()
-                && bidAmount.compareTo(currentHighestBid.get().getAmount()) <= 0) {
-            throw new BidValidationException(
-                    "Bid harus lebih tinggi dari bid tertinggi saat ini.");
+        if (currentHighestBid.isPresent()) {
+            BigDecimal highest = currentHighestBid.get().getAmount();
+            if (bidAmount.compareTo(highest) <= 0) {
+                BigDecimal minimumBid = highest.add(BigDecimal.ONE);
+                throw new BidTooLowException(
+                        "Bid harus lebih tinggi dari bid tertinggi saat ini: " + highest + ".",
+                        minimumBid);
+            }
+        } else if (bidAmount.compareTo(startingPrice) < 0) {
+            throw new BidTooLowException(
+                    "Bid harus lebih besar atau sama dengan starting price " + startingPrice + ".",
+                    startingPrice);
         }
     }
 }
