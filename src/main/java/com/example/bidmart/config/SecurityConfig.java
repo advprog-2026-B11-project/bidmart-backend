@@ -27,9 +27,12 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final AuthRateLimitFilter authRateLimitFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          AuthRateLimitFilter authRateLimitFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.authRateLimitFilter = authRateLimitFilter;
     }
 
     @Bean
@@ -41,12 +44,11 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/verify-mfa", "/api/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/verify-mfa", "/api/auth/refresh", "/api/auth/resend-verification").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/error").permitAll()
-                .requestMatchers("/api/wallet/**").permitAll()
-                
+
                 .requestMatchers(
                     "/api/wallet/hold",
                     "/api/wallet/release",
@@ -54,7 +56,6 @@ public class SecurityConfig {
                     "/api/wallet/confirm-delivery"
                 ).hasRole("INTERNAL_SERVICE")
 
-                // User endpoints wallet
                 .requestMatchers("/api/wallet/**").authenticated()
                 
                 .requestMatchers("/api/listings/**").permitAll()
@@ -62,10 +63,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/bids/mocks/**").permitAll()
                 .requestMatchers("/api/bids/**").permitAll()
                 .requestMatchers("/api/orders/**").authenticated()
-                .requestMatchers("/api/notifications/**").authenticated()
+                .requestMatchers("/api/notifications/**").permitAll()
 
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

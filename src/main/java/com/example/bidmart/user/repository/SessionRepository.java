@@ -4,6 +4,7 @@ import com.example.bidmart.user.model.Session;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,4 +15,5 @@ public interface SessionRepository extends JpaRepository<Session, UUID> {
     void deleteAllByUserId(UUID userId);
     List<Session> findByUserIdAndIsRevokedFalseOrderByCreatedAtAsc(UUID userId);
     Optional<Session> findByIdAndUserId(UUID id, UUID userId);
+    Optional<Session> findByIdAndIsRevokedFalseAndExpiresAtAfter(UUID id, Instant now);
 }

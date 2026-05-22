@@ -2,12 +2,12 @@ package com.example.bidmart.user.controller;
 
 import com.example.bidmart.user.dto.SessionResponse;
 import com.example.bidmart.user.service.SessionService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
@@ -16,7 +16,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SessionControllerTest {
@@ -30,33 +32,34 @@ class SessionControllerTest {
     @InjectMocks
     private SessionController sessionController;
 
-    private UUID sessionId;
-
-    @BeforeEach
-    void setUp() {
-        sessionId = UUID.randomUUID();
-    }
-
     @Test
-    void getMySessions_success() {
-        when(authentication.getName()).thenReturn("testuser");
-        List<SessionResponse> mockResponses = List.of(new SessionResponse(sessionId, "Chrome", Instant.now(), Instant.now().plusSeconds(3600)));
-        when(sessionService.getActiveSessions("testuser")).thenReturn(mockResponses);
+    void getMySessions_shouldReturnOk() {
+        UUID sessionId = UUID.randomUUID();
+        SessionResponse responseItem = SessionResponse.builder()
+                .id(sessionId)
+                .deviceInfo("Device")
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        when(authentication.getName()).thenReturn("alice");
+        when(sessionService.getActiveSessions("alice")).thenReturn(List.of(responseItem));
 
         ResponseEntity<List<SessionResponse>> response = sessionController.getMySessions(authentication);
 
-        assertEquals(200, response.getStatusCode().value());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
-        assertEquals("Chrome", response.getBody().get(0).getDeviceInfo());
+        verify(sessionService, times(1)).getActiveSessions("alice");
     }
 
     @Test
-    void revokeSession_success() {
-        when(authentication.getName()).thenReturn("testuser");
+    void revokeSession_shouldReturnNoContent() {
+        UUID sessionId = UUID.randomUUID();
+        when(authentication.getName()).thenReturn("alice");
 
         ResponseEntity<Void> response = sessionController.revokeSession(sessionId, authentication);
 
-        assertEquals(204, response.getStatusCode().value());
-        verify(sessionService).revokeSession("testuser", sessionId);
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(sessionService, times(1)).revokeSession("alice", sessionId);
     }
 }

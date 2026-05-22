@@ -9,6 +9,8 @@ import com.example.bidmart.common.event.BalanceTopUpEvent;
 import com.example.bidmart.common.event.BidPlacedEvent;
 import com.example.bidmart.common.event.OrderDeliveredEvent;
 import com.example.bidmart.common.event.OutbidEvent;
+import com.example.bidmart.common.event.UserDeactivatedEvent;
+import com.example.bidmart.common.event.UserRoleChangedEvent;
 import com.example.bidmart.common.event.OrderRefundedEvent;
 import com.example.bidmart.common.event.AuctionClosedNoWinnerEvent;
 import com.example.bidmart.common.event.AuctionExtendedEvent;

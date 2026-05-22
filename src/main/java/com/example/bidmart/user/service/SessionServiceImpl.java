@@ -2,9 +2,11 @@ package com.example.bidmart.user.service;
 
 import com.example.bidmart.user.dto.SessionResponse;
 import com.example.bidmart.user.model.Session;
+import com.example.bidmart.user.model.SessionOverflowPolicy;
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,24 +20,34 @@ import java.util.stream.Collectors;
 public class SessionServiceImpl implements SessionService {
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
+    private final SessionOverflowPolicy overflowPolicy;
 
-    public SessionServiceImpl(SessionRepository sessionRepository, UserRepository userRepository) {
+    public SessionServiceImpl(SessionRepository sessionRepository,
+                              UserRepository userRepository,
+                              @Value("${app.session.overflow-policy:REVOKE_OLDEST}") SessionOverflowPolicy overflowPolicy) {
         this.sessionRepository = sessionRepository;
         this.userRepository = userRepository;
+        this.overflowPolicy = overflowPolicy;
     }
 
     @Override
     @Transactional
     public void enforceSessionLimit(User user, int maxSessions) {
         List<Session> activeSessions = sessionRepository.findByUserIdAndIsRevokedFalseOrderByCreatedAtAsc(user.getId());
-        if (activeSessions.size() >= maxSessions) {
-            // Revoke the oldest sessions to respect the limit
-            int excess = activeSessions.size() - maxSessions + 1;
-            for (int i = 0; i < excess; i++) {
-                activeSessions.get(i).setRevoked(true);
-            }
-            sessionRepository.saveAll(activeSessions.subList(0, excess));
+        if (activeSessions.size() < maxSessions) {
+            return;
         }
+        if (overflowPolicy == SessionOverflowPolicy.REJECT_NEW) {
+            throw new IllegalArgumentException(
+                "Maximum concurrent sessions (" + maxSessions + ") reached. Please log out from another device first."
+            );
+        }
+        // REVOKE_OLDEST: revoke oldest sessions to make room for the new one
+        int excess = activeSessions.size() - maxSessions + 1;
+        for (int i = 0; i < excess; i++) {
+            activeSessions.get(i).setRevoked(true);
+        }
+        sessionRepository.saveAll(activeSessions.subList(0, excess));
     }
 
     @Override

@@ -12,6 +12,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class JwtServiceImpl implements JwtService {
@@ -26,10 +27,11 @@ public class JwtServiceImpl implements JwtService {
     private long refreshTokenExpiration;
 
     @Override
-    public String generateAccessToken(User user) {
+    public String generateAccessToken(User user, UUID sessionId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", user.getRole().getName());
         claims.put("userId", user.getId().toString());
+        claims.put("sid", sessionId.toString());
         return buildToken(claims, user.getUsername(), accessTokenExpiration);
     }
 
@@ -41,6 +43,19 @@ public class JwtServiceImpl implements JwtService {
     @Override
     public String extractUsername(String token) {
         return extractAllClaims(token).getSubject();
+    }
+
+    @Override
+    public UUID extractSessionId(String token) {
+        String sid = extractAllClaims(token).get("sid", String.class);
+        if (sid == null || sid.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(sid);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     @Override

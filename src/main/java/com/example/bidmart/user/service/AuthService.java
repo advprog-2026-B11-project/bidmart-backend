@@ -11,6 +11,7 @@ public interface AuthService {
     AuthResponse register(RegisterRequest request);
     AuthResponse login(LoginRequest request, String deviceInfo);
     boolean verifyEmail(String token); 
+    void resendVerification(String identifier);
     AuthResponse refreshToken(String refreshTokenStr);
     AuthResponse verifyMfaLogin(MfaVerificationRequest request);
     AuthResponse finalizeLogin(User user, String deviceInfo);

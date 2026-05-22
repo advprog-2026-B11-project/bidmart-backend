@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: bidmart-postgres-local
+    environment:
+      POSTGRES_USER: bidmart_user
+      POSTGRES_PASSWORD: bidmart_password
+      POSTGRES_DB: bidmart_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_local_data:

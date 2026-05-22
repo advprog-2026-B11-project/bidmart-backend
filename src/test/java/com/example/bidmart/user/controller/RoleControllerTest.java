@@ -1,23 +1,27 @@
 package com.example.bidmart.user.controller;
 
+import com.example.bidmart.user.dto.CreateRoleRequest;
+import com.example.bidmart.user.dto.UpdateRolePermissionsRequest;
 import com.example.bidmart.user.model.Permission;
 import com.example.bidmart.user.model.Role;
 import com.example.bidmart.user.repository.PermissionRepository;
 import com.example.bidmart.user.repository.RoleRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,96 +36,113 @@ class RoleControllerTest {
     @InjectMocks
     private RoleController roleController;
 
-    private Role mockRole;
-    private Permission mockPermission;
-
-    @BeforeEach
-    void setUp() {
-        mockPermission = new Permission(UUID.randomUUID(), "TEST_PERMISSION");
-
-        mockRole = new Role();
-        mockRole.setId(UUID.randomUUID());
-        mockRole.setName("USER");
-        // Must use a mutable set
-        mockRole.setPermissions(new HashSet<>());
-    }
-
     @Test
-    void assignPermission_success() {
-        when(roleRepository.findByName("USER")).thenReturn(Optional.of(mockRole));
-        when(permissionRepository.findByName("TEST_PERMISSION")).thenReturn(Optional.of(mockPermission));
+    void createRole_shouldReturnOkWhenRoleDoesNotExist() {
+        CreateRoleRequest request = new CreateRoleRequest();
+        request.setName("NEW_ROLE");
 
-        ResponseEntity<String> response = roleController.assignPermission("USER", "TEST_PERMISSION");
-
-        assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("successfully added"));
-        assertTrue(mockRole.getPermissions().contains(mockPermission));
-
-        verify(roleRepository).save(mockRole);
-    }
-
-    @Test
-    void assignPermission_roleNotFound() {
-        when(roleRepository.findByName("UNKNOWN")).thenReturn(Optional.empty());
-
-        assertThrows(IllegalArgumentException.class, () -> roleController.assignPermission("UNKNOWN", "TEST_PERMISSION"));
-    }
-
-    @Test
-    void assignPermission_permissionNotFound() {
-        when(roleRepository.findByName("USER")).thenReturn(Optional.of(mockRole));
-        when(permissionRepository.findByName("UNKNOWN")).thenReturn(Optional.empty());
-
-        assertThrows(IllegalArgumentException.class, () -> roleController.assignPermission("USER", "UNKNOWN"));
-    }
-
-    @Test
-    void createRole_success() {
         when(roleRepository.findByName("NEW_ROLE")).thenReturn(Optional.empty());
-        
-        Role newRole = new Role();
-        newRole.setName("NEW_ROLE");
-        when(roleRepository.save(any(Role.class))).thenReturn(newRole);
+        Role saved = new Role();
+        saved.setName("NEW_ROLE");
+        saved.setPermissions(new HashSet<>());
+        when(roleRepository.save(any(Role.class))).thenReturn(saved);
 
-        ResponseEntity<Role> response = roleController.createRole("NEW_ROLE");
+        ResponseEntity<?> response = roleController.createRole(request);
 
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals("NEW_ROLE", response.getBody().getName());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(roleRepository, times(1)).save(any(Role.class));
     }
 
     @Test
-    void createRole_alreadyExists() {
-        when(roleRepository.findByName("USER")).thenReturn(Optional.of(mockRole));
+    void createRole_shouldReturnBadRequestWhenRoleExists() {
+        CreateRoleRequest request = new CreateRoleRequest();
+        request.setName("EXISTING_ROLE");
 
-        ResponseEntity<Role> response = roleController.createRole("USER");
+        when(roleRepository.findByName("EXISTING_ROLE")).thenReturn(Optional.of(new Role()));
 
-        assertEquals(400, response.getStatusCode().value());
+        ResponseEntity<?> response = roleController.createRole(request);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        verify(roleRepository, never()).save(any(Role.class));
     }
 
     @Test
-    void revokePermission_success() {
-        mockRole.getPermissions().add(mockPermission);
-        
-        when(roleRepository.findByName("USER")).thenReturn(Optional.of(mockRole));
-        when(permissionRepository.findByName("TEST_PERMISSION")).thenReturn(Optional.of(mockPermission));
+    void updateRolePermissions_shouldReplacePermissions() {
+        UUID roleId = UUID.randomUUID();
+        UUID permId = UUID.randomUUID();
 
-        ResponseEntity<String> response = roleController.revokePermission("USER", "TEST_PERMISSION");
+        Role role = new Role();
+        role.setName("USER");
+        role.setPermissions(new HashSet<>());
 
-        assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("successfully revoked"));
-        assertFalse(mockRole.getPermissions().contains(mockPermission));
+        Permission permission = new Permission();
+        permission.setName("bid:place");
 
-        verify(roleRepository).save(mockRole);
+        UpdateRolePermissionsRequest request = new UpdateRolePermissionsRequest();
+        request.setPermissionIds(List.of(permId));
+
+        when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+        when(permissionRepository.findAllById(List.of(permId))).thenReturn(List.of(permission));
+        when(roleRepository.save(role)).thenReturn(role);
+
+        ResponseEntity<?> response = roleController.updateRolePermissions(roleId, request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(roleRepository, times(1)).save(role);
     }
 
     @Test
-    void revokePermission_doesNotHavePermission() {
-        when(roleRepository.findByName("USER")).thenReturn(Optional.of(mockRole));
-        when(permissionRepository.findByName("TEST_PERMISSION")).thenReturn(Optional.of(mockPermission));
+    void updateRolePermissions_shouldThrowWhenRoleNotFound() {
+        UUID roleId = UUID.randomUUID();
+        UpdateRolePermissionsRequest request = new UpdateRolePermissionsRequest();
+        request.setPermissionIds(List.of());
 
-        ResponseEntity<String> response = roleController.revokePermission("USER", "TEST_PERMISSION");
+        when(roleRepository.findById(roleId)).thenReturn(Optional.empty());
 
-        assertEquals(400, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("does not have that permission"));
+        assertThrows(IllegalArgumentException.class,
+                () -> roleController.updateRolePermissions(roleId, request));
+    }
+
+    @Test
+    void deleteRole_shouldReturnNoContent() {
+        UUID roleId = UUID.randomUUID();
+        Role role = new Role();
+        role.setPermissions(new HashSet<>());
+        when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+
+        ResponseEntity<Void> response = roleController.deleteRole(roleId);
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(roleRepository, times(1)).delete(role);
+    }
+
+    @Test
+    void deleteRole_shouldThrowWhenRoleNotFound() {
+        UUID roleId = UUID.randomUUID();
+        when(roleRepository.findById(roleId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> roleController.deleteRole(roleId));
+    }
+
+    @Test
+    void listRoles_shouldReturnOk() {
+        Role role = new Role();
+        role.setName("BUYER");
+        role.setPermissions(new HashSet<>());
+        when(roleRepository.findAll()).thenReturn(List.of(role));
+
+        ResponseEntity<?> response = roleController.listRoles();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void listPermissions_shouldReturnOk() {
+        when(permissionRepository.findAll()).thenReturn(List.of());
+
+        ResponseEntity<?> response = roleController.listPermissions();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
     }
 }
