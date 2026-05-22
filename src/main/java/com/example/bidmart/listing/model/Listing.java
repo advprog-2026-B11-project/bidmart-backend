@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import jakarta.persistence.Index;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,13 +20,22 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotBlank;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 
 @Entity
-@Table(name = "listings")
+@Table(name = "listings", indexes = {
+        @Index(name = "idx_listing_status", columnList = "status"),
+        @Index(name = "idx_listing_end_time", columnList = "end_time"),
+        @Index(name = "idx_listing_seller_id", columnList = "seller_id"),
+        @Index(name = "idx_listing_category_id", columnList = "category_id")
+})
 public class Listing {
 
     @Id
@@ -38,7 +48,7 @@ public class Listing {
     @Column(name = "category_id", nullable = false)
     private UUID categoryId;
 
-    @Column(nullable = false)
+    @NotBlank @Column(nullable = false)
     private String title;
 
     private String description;
@@ -46,13 +56,13 @@ public class Listing {
     @Column(name = "image_url")
     private String imageUrl;
 
-    @Column(name = "starting_price", nullable = false)
+    @DecimalMin("0.01") @Column(name = "starting_price", nullable = false)
     private BigDecimal startingPrice;
 
-    @Column(name = "reserve_price")
+    @DecimalMin("0.01") @Column(name = "reserve_price")
     private BigDecimal reservePrice;
 
-    @Column(name = "end_time", nullable = false)
+    @Future @Column(name = "end_time", nullable = false)
     private LocalDateTime endTime;
 
     @Enumerated(EnumType.STRING)

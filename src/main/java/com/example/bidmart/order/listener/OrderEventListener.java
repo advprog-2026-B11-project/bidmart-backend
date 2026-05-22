@@ -17,6 +17,12 @@ public class OrderEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleAuctionWon(AuctionWonEvent event) {
-        orderService.createOrderAutomatically(event.listingId(), event.winnerId());
+
+        orderService.createOrderAutomatically(
+                event.listingId(),
+                event.winnerId(),
+                event.sellerId(),
+                event.winningPrice()
+        );
     }
 }

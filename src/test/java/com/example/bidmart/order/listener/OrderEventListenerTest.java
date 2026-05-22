@@ -11,6 +11,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -27,11 +29,17 @@ class OrderEventListenerTest {
     void handleAuctionWon_success() {
         UUID listingId = UUID.randomUUID();
         UUID winnerId = UUID.randomUUID();
+        UUID sellerId = UUID.randomUUID();
         BigDecimal winningPrice = new BigDecimal("250000.00");
-        AuctionWonEvent event = new AuctionWonEvent(listingId, winnerId, winningPrice);
+        AuctionWonEvent event = new AuctionWonEvent(listingId, winnerId, sellerId, winningPrice);
 
         orderEventListener.handleAuctionWon(event);
 
-        verify(orderService, times(1)).createOrderAutomatically(listingId, winnerId);
+        verify(orderService, times(1)).createOrderAutomatically(
+                eq(listingId),
+                eq(winnerId),
+                any(),
+                eq(winningPrice)
+        );
     }
 }
