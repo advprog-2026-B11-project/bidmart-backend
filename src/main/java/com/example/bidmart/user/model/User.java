@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -27,6 +29,12 @@ public class User {
     @Column(name = "display_name", nullable = false)
     private String displayName;
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
+    @Column(name = "shipping_address")
+    private String shippingAddress;
+
     @Column(nullable = false)
     private String password;
 
@@ -48,4 +56,18 @@ public class User {
 
     @Column(name = "mfa_secret")
     private String mfaSecret;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mfa_method")
+    private MfaMethod mfaMethod;
+
+    @Column(name = "mfa_email_code")
+    private String mfaEmailCode;
+
+    @Column(name = "mfa_email_code_expires_at")
+    private Instant mfaEmailCodeExpiresAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "TIMESTAMPTZ DEFAULT NOW()")
+    private Instant createdAt;
 }

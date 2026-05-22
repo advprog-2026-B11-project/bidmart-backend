@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +32,7 @@ public class BidController {
     }
 
     @PostMapping
+        @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_PLACE)")
     public ResponseEntity<BidResponse> placeBid(
             @RequestBody CreateBidRequest request,
             Authentication authentication
@@ -41,27 +43,32 @@ public class BidController {
     }
 
     @GetMapping("/listing/{listingId}")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_READ)")
     public List<BidResponse> getBidsByListing(@PathVariable("listingId") UUID listingId) {
         return bidService.getBidsByListing(listingId);
     }
 
     @GetMapping("/listing/{listingId}/highest")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_READ)")
     public BidResponse getHighestBid(@PathVariable("listingId") UUID listingId) {
         return bidService.getHighestBid(listingId);
     }
 
     @GetMapping("/listing/{listingId}/minimum-bid")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_READ)")
     public ResponseEntity<BigDecimal> getMinimumNextBid(@PathVariable("listingId") UUID listingId) {
         return ResponseEntity.ok(bidService.getMinimumNextBid(listingId));
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_READ)")
     public List<BidResponse> getMyBids(Authentication authentication) {
         UUID buyerId = resolveCurrentUserId(authentication);
         return bidService.getBidsByBuyer(buyerId);
     }
 
     @GetMapping("/buyer/{buyerId}")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_READ)")
     public List<BidResponse> getBidsByBuyer(
             @PathVariable("buyerId") UUID buyerId,
             Authentication authentication

@@ -5,8 +5,8 @@ import com.example.bidmart.user.dto.LoginRequest;
 import com.example.bidmart.user.dto.MfaVerificationRequest;
 import com.example.bidmart.user.dto.RefreshTokenRequest;
 import com.example.bidmart.user.dto.RegisterRequest;
+import com.example.bidmart.user.dto.ResendVerificationRequest;
 import com.example.bidmart.user.service.AuthService;
-import com.example.bidmart.user.service.MfaService;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -59,5 +59,11 @@ public class AuthController {
     public ResponseEntity<AuthResponse> verifyMfa(@Valid @RequestBody MfaVerificationRequest request){
         AuthResponse response = authService.verifyMfaLogin(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<String> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request.getIdentifier());
+        return ResponseEntity.ok("Verification email sent.");
     }
 }

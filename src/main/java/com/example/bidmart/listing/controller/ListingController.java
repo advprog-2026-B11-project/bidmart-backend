@@ -34,7 +34,7 @@ public class ListingController {
         this.userService = userService;
     }
 
-    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_CREATE)")
     @PostMapping
     public ResponseEntity<ListingResponse> createListing(
             @Validated({Default.class, OnCreate.class}) @RequestBody CreateListingRequest request,
@@ -42,7 +42,8 @@ public class ListingController {
         UUID sellerId = resolveCurrentUserId(authentication);
         return ResponseEntity.ok(ListingResponse.from(listingService.createListing(request, sellerId)));
     }
-
+    
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_READ)")
     @GetMapping
     public ResponseEntity<PaginatedResponse<ListingResponse>> getAllListings(
             @RequestParam(name = "page", defaultValue = "0") int page,
@@ -77,6 +78,7 @@ public class ListingController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_READ)")
     public ResponseEntity<ListingResponse> getListingById(@PathVariable("id") UUID id) {
         return listingService.getListingById(id)
                 .map(ListingResponse::from)
@@ -84,7 +86,7 @@ public class ListingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_UPDATE)")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateListing(
             @PathVariable("id") UUID id,
@@ -101,7 +103,7 @@ public class ListingController {
         }
     }
 
-    @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).LISTING_DELETE)")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteListing(@PathVariable("id") UUID id, Authentication authentication) {
         try {

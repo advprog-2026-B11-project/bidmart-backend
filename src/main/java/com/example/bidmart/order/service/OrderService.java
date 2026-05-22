@@ -43,8 +43,8 @@ public class OrderService {
         return orderRepository.save(newOrder);
     }
 
-    public List<Order> getOrdersByBuyer(UUID buyerId) {
-        return orderRepository.findByBuyerId(buyerId);
+    public List<Order> getOrdersByUser(UUID userId) {
+        return orderRepository.findByBuyerIdOrSellerId(userId, userId);
     }
 
     @Transactional

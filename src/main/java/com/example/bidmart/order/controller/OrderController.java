@@ -25,6 +25,14 @@ public class OrderController {
     private final OrderService orderService;
     private final UserService userService;
 
+    @GetMapping("/buyer/{buyerId}")
+//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_READ)")
+    @PreAuthorize("hasAuthority('order:read') and (#buyerId.toString() == authentication.name or hasAuthority('SCOPE_ADMIN'))")
+    public ResponseEntity<List<Order>> getOrdersByBuyer(@PathVariable UUID buyerId) {
+        List<Order> orders = orderService.getOrdersByUser(buyerId);
+        return ResponseEntity.ok(orders);
+    }
+
     private UUID resolveCurrentUserId(Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {
             throw new AccessDeniedException("User belum terautentikasi.");
@@ -38,21 +46,24 @@ public class OrderController {
                 .anyMatch(a -> a.getAuthority().equals("SCOPE_ADMIN") || a.getAuthority().equals("ROLE_ADMIN"));
     }
 
-    @GetMapping("/buyer/{buyerId}")
+    @GetMapping("/user/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Order>> getOrdersByBuyer(
-            @PathVariable("buyerId") UUID buyerId,
+    public ResponseEntity<List<Order>> getOrdersByUser(
+            @PathVariable("userId") UUID userId,
             Authentication authentication) {
         
         UUID authenticatedUserId = resolveCurrentUserId(authentication);
-        if (!authenticatedUserId.equals(buyerId) && !isAdmin(authentication)) {
+        if (!authenticatedUserId.equals(userId) && !isAdmin(authentication)) {
             throw new AccessDeniedException("Anda tidak dapat mengakses order milik user lain.");
         }
 
-        List<Order> orders = orderService.getOrdersByBuyer(buyerId);
+        List<Order> orders = orderService.getOrdersByUser(userId);
         return ResponseEntity.ok(orders);
     }
 
+//     @PatchMapping("/{orderId}/status")
+//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_UPDATE_STATUS)")
+//     public ResponseEntity<Order> updateOrderStatus(
     @PatchMapping("/{orderId}/tracking")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> updateTrackingNumber(
@@ -65,6 +76,9 @@ public class OrderController {
         return ResponseEntity.ok(updatedOrder);
     }
 
+//     @PatchMapping("/{orderId}/tracking")
+//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_UPDATE_TRACKING)")
+//     public ResponseEntity<Order> updateTrackingNumber(
     @PatchMapping("/{orderId}/confirm")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> confirmDelivery(
@@ -76,6 +90,11 @@ public class OrderController {
         return ResponseEntity.ok(updatedOrder);
     }
 
+//     @PostMapping("/test-create")
+//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_CREATE)")
+//     public ResponseEntity<Order> createOrderTest(@RequestBody Map<String, String> requestBody) {
+//         UUID listingId = UUID.fromString(requestBody.get("listingId"));
+//         UUID buyerId = UUID.fromString(requestBody.get("buyerId"));
     @PatchMapping("/{orderId}/dispute")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> disputeOrder(
@@ -121,7 +140,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{orderId}")
-    @PreAuthorize("hasAuthority('SCOPE_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('order:delete') or hasAuthority('SCOPE_ADMIN')")
     public ResponseEntity<Map<String, String>> deleteOrder(@PathVariable("orderId") UUID orderId) {
         orderService.deleteOrder(orderId);
         return ResponseEntity.ok(Map.of("message", "Pesanan berhasil dihapus"));

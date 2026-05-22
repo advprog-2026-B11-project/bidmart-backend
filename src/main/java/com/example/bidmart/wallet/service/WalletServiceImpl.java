@@ -352,7 +352,10 @@ public class WalletServiceImpl implements WalletService {
     
     private Wallet getWalletByUserIdWithLock(UUID userId) {
         return walletRepository.findByUserIdWithLock(userId)
-                .orElseThrow(() -> new WalletNotFoundException("Wallet tidak ditemukan."));
+                .orElseGet(() -> {
+                    Wallet newWallet = new Wallet(userId);
+                    return walletRepository.save(newWallet);
+                });
     }
 
     private PaymentStrategy resolvePaymentStrategy(PaymentMethod method) {
