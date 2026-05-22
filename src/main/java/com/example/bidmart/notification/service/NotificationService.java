@@ -51,7 +51,7 @@ public class NotificationService {
         if (preference.isPushEnabled()) {
             try {
                 messagingTemplate.convertAndSendToUser(
-                        userId.toString(), "/queue/notifications", notification != null ? notification : message
+                        userId.toString(), "/queue/notifications", notification
                 );
             } catch (Exception e) {
                 log.error("Gagal mengirim push WebSocket: {}", e.getMessage());
@@ -59,10 +59,8 @@ public class NotificationService {
             }
         }
 
-        if (notification != null) {
-            notification.setDeliveryStatus(deliverySuccess ? "DELIVERED" : "FAILED");
-            notificationRepository.save(notification);
-        }
+        notification.setDeliveryStatus(deliverySuccess ? "DELIVERED" : "FAILED");
+        notificationRepository.save(notification);
 
         return notification;
     }

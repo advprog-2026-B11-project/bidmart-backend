@@ -228,6 +228,28 @@ class NotificationServiceTest {
     }
 
     @Test
+    void markAsRead_wrongUser_throwsException() {
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+        
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.markAsRead(notificationId, UUID.randomUUID());
+        });
+        
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void deleteNotification_wrongUser_throwsException() {
+        when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
+        
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            notificationService.deleteNotification(notificationId, UUID.randomUUID());
+        });
+        
+        verify(notificationRepository, never()).delete(any(Notification.class));
+    }
+
+    @Test
     void deleteNotification_notFound_throwsException() {
         when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> notificationService.deleteNotification(notificationId, userId));
