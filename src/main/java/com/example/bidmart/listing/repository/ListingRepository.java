@@ -40,17 +40,26 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
 
     List<Listing> findBySellerIdAndStatusIn(UUID sellerId, List<AuctionStatus> statuses);
 
-    @Query("SELECT l FROM Listing l WHERE " +
-            "(:keyword IS NULL OR LOWER(l.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(l.description) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
-            "(:category IS NULL OR l.categoryId = :category) AND " +
-            "(:minPrice IS NULL OR l.startingPrice >= :minPrice) AND " +
-            "(:maxPrice IS NULL OR l.startingPrice <= :maxPrice)")
+    @Query(value = "SELECT * FROM listings WHERE " +
+            "(CAST(:keyword AS text) IS NULL OR LOWER(title) LIKE LOWER('%' || CAST(:keyword AS text) || '%') OR LOWER(description) LIKE LOWER('%' || CAST(:keyword AS text) || '%')) AND " +
+            "(CAST(:category AS text) IS NULL OR category_id = CAST(:category AS uuid)) AND " +
+            "(CAST(:minPrice AS numeric) IS NULL OR starting_price >= CAST(:minPrice AS numeric)) AND " +
+            "(CAST(:maxPrice AS numeric) IS NULL OR starting_price <= CAST(:maxPrice AS numeric)) " +
+            "ORDER BY created_at DESC",
+            nativeQuery = true)
     List<Listing> findBySearchCriteria(@Param("keyword") String keyword, @Param("category") UUID category, @Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice);
 
-    @Query("SELECT l FROM Listing l WHERE " +
-            "(:keyword IS NULL OR LOWER(l.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(l.description) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
-            "(:category IS NULL OR l.categoryId = :category) AND " +
-            "(:minPrice IS NULL OR l.startingPrice >= :minPrice) AND " +
-            "(:maxPrice IS NULL OR l.startingPrice <= :maxPrice)")
+    @Query(value = "SELECT * FROM listings WHERE " +
+            "(CAST(:keyword AS text) IS NULL OR LOWER(title) LIKE LOWER('%' || CAST(:keyword AS text) || '%') OR LOWER(description) LIKE LOWER('%' || CAST(:keyword AS text) || '%')) AND " +
+            "(CAST(:category AS text) IS NULL OR category_id = CAST(:category AS uuid)) AND " +
+            "(CAST(:minPrice AS numeric) IS NULL OR starting_price >= CAST(:minPrice AS numeric)) AND " +
+            "(CAST(:maxPrice AS numeric) IS NULL OR starting_price <= CAST(:maxPrice AS numeric)) " +
+            "ORDER BY created_at DESC",
+            countQuery = "SELECT count(*) FROM listings WHERE " +
+            "(CAST(:keyword AS text) IS NULL OR LOWER(title) LIKE LOWER('%' || CAST(:keyword AS text) || '%') OR LOWER(description) LIKE LOWER('%' || CAST(:keyword AS text) || '%')) AND " +
+            "(CAST(:category AS text) IS NULL OR category_id = CAST(:category AS uuid)) AND " +
+            "(CAST(:minPrice AS numeric) IS NULL OR starting_price >= CAST(:minPrice AS numeric)) AND " +
+            "(CAST(:maxPrice AS numeric) IS NULL OR starting_price <= CAST(:maxPrice AS numeric))",
+            nativeQuery = true)
     Page<Listing> findBySearchCriteria(@Param("keyword") String keyword, @Param("category") UUID category, @Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice, Pageable pageable);
 }
