@@ -52,9 +52,9 @@ class OrderControllerTest {
     void getOrdersByBuyer_sameUser_returnsOk() {
         when(authentication.getName()).thenReturn("buyeruser");
         when(userService.getUserIdByUsername("buyeruser")).thenReturn(buyerId);
-        when(orderService.getOrdersByBuyer(buyerId)).thenReturn(List.of(order));
+        when(orderService.getOrdersByUser(buyerId)).thenReturn(List.of(order));
 
-        ResponseEntity<List<Order>> response = orderController.getOrdersByBuyer(buyerId, authentication);
+        ResponseEntity<List<Order>> response = orderController.getOrdersByUser(buyerId, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
@@ -67,9 +67,9 @@ class OrderControllerTest {
         when(userService.getUserIdByUsername("admin")).thenReturn(adminId);
         GrantedAuthority adminAuthority = () -> "ROLE_ADMIN";
         doReturn(List.of(adminAuthority)).when(authentication).getAuthorities();
-        when(orderService.getOrdersByBuyer(buyerId)).thenReturn(List.of(order));
+        when(orderService.getOrdersByUser(buyerId)).thenReturn(List.of(order));
 
-        ResponseEntity<List<Order>> response = orderController.getOrdersByBuyer(buyerId, authentication);
+        ResponseEntity<List<Order>> response = orderController.getOrdersByUser(buyerId, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
@@ -82,14 +82,12 @@ class OrderControllerTest {
         GrantedAuthority userAuthority = () -> "ROLE_USER";
         doReturn(List.of(userAuthority)).when(authentication).getAuthorities();
 
-        assertThrows(AccessDeniedException.class,
-                () -> orderController.getOrdersByBuyer(buyerId, authentication));
-    }
+        assertThrows(AccessDeniedException.class, 
+                () -> orderController.getOrdersByUser(buyerId, authentication));
 
-    @Test
-    void getOrdersByBuyer_nullAuthentication_throwsAccessDenied() {
-        assertThrows(AccessDeniedException.class,
-                () -> orderController.getOrdersByBuyer(buyerId, null));
+        // Test with null authentication
+        assertThrows(AccessDeniedException.class, 
+                () -> orderController.getOrdersByUser(buyerId, null));
     }
 
     // ── isAdmin ───────────────────────────────────────────────────────────────
@@ -101,9 +99,9 @@ class OrderControllerTest {
         when(userService.getUserIdByUsername("admin")).thenReturn(adminId);
         GrantedAuthority scopeAdmin = () -> "SCOPE_ADMIN";
         doReturn(List.of(scopeAdmin)).when(authentication).getAuthorities();
-        when(orderService.getOrdersByBuyer(buyerId)).thenReturn(List.of(order));
+        when(orderService.getOrdersByUser(buyerId)).thenReturn(List.of(order));
 
-        ResponseEntity<List<Order>> response = orderController.getOrdersByBuyer(buyerId, authentication);
+        ResponseEntity<List<Order>> response = orderController.getOrdersByUser(buyerId, authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }

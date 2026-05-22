@@ -134,9 +134,17 @@ class WalletServiceTest {
         @Test void exceedsMax_throws() {
             assertThrows(InvalidAmountException.class, () -> walletService.topUp(userId, topUpReq(new BigDecimal("200000000"))));
         }
-        @Test void walletNotFound_throws() {
+        @Test void walletNotFound_autoCreatesWallet() {
+            TopUpRequest req = topUpReq(new BigDecimal("1000"));
             when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.empty());
-            assertThrows(WalletNotFoundException.class, () -> walletService.topUp(userId, topUpReq(new BigDecimal("1000"))));
+            when(walletRepository.save(any(Wallet.class))).thenAnswer(i -> {
+                Wallet w = i.getArgument(0);
+                if (w.getId() == null) w.setId(UUID.randomUUID());
+                return w;
+            });
+
+            Wallet w = walletService.topUp(userId, req);
+            assertEquals(new BigDecimal("1000"), w.getBalanceAvailable());
         }
         @Test void nullPaymentMethod_throws() {
             TopUpRequest req = new TopUpRequest(new BigDecimal("1000"), null, Map.of(), "k");

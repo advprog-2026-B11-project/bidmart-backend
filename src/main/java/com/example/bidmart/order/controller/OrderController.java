@@ -38,18 +38,18 @@ public class OrderController {
                 .anyMatch(a -> a.getAuthority().equals("SCOPE_ADMIN") || a.getAuthority().equals("ROLE_ADMIN"));
     }
 
-    @GetMapping("/buyer/{buyerId}")
+    @GetMapping("/user/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Order>> getOrdersByBuyer(
-            @PathVariable("buyerId") UUID buyerId,
+    public ResponseEntity<List<Order>> getOrdersByUser(
+            @PathVariable("userId") UUID userId,
             Authentication authentication) {
         
         UUID authenticatedUserId = resolveCurrentUserId(authentication);
-        if (!authenticatedUserId.equals(buyerId) && !isAdmin(authentication)) {
+        if (!authenticatedUserId.equals(userId) && !isAdmin(authentication)) {
             throw new AccessDeniedException("Anda tidak dapat mengakses order milik user lain.");
         }
 
-        List<Order> orders = orderService.getOrdersByBuyer(buyerId);
+        List<Order> orders = orderService.getOrdersByUser(userId);
         return ResponseEntity.ok(orders);
     }
 

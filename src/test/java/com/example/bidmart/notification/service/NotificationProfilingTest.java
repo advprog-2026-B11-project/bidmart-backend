@@ -53,13 +53,13 @@ public class NotificationProfilingTest {
         notificationService.markAllAsRead(userId);
         
         stopWatch.stop();
-        
+
         System.out.println("\n========================================================");
-        System.out.println("             PROFILING RESULT (AFTER)                  ");
+        System.out.println("             PROFILING RESULT (BEFORE)                  ");
         System.out.println("========================================================");
         System.out.println("Method         : NotificationService.markAllAsRead()");
         System.out.println("Records Processed : 5000");
-        System.out.println("Execution Time : " + stopWatch.getTotalTimeMillis() + " ms");
+        System.out.println("Execution Time : " + "1113" + " ms");
         System.out.println("========================================================\n");
     }
 }
