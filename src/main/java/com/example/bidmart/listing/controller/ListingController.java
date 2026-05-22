@@ -15,8 +15,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import java.math.BigDecimal;
 import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
+import com.example.bidmart.common.validation.OnCreate;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -33,7 +36,7 @@ public class ListingController {
 
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMIN')") @PostMapping
     public ResponseEntity<Listing> createListing(
-            @Valid @RequestBody Listing listing,
+            @Validated({Default.class, OnCreate.class}) @RequestBody Listing listing,
             Authentication authentication
     ) {
         UUID sellerId = resolveCurrentUserId(authentication);
