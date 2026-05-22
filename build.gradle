@@ -22,7 +22,7 @@ repositories {
 }
 
 dependencies {
-//	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -47,28 +47,35 @@ dependencies {
 
 	testCompileOnly 'org.projectlombok:lombok:1.18.32'
 	testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
+
+	implementation 'io.github.cdimascio:dotenv-java:3.0.0'
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
+    exclude '**/*FunctionalTest.class'
+    finalizedBy jacocoTestReport
+}
 
-	filter {
-		excludeTestsMatching "*FunctionalTest"
-	}
-	finalizedBy jacocoTestReport
+task functionalTest(type: Test) {
+    group = 'verification'
+    include '**/*FunctionalTest.class'
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
 }
 
 tasks.named('jacocoTestReport') {
-	dependsOn test
-	reports {
-		xml.required = true
-		html.required = true
-	}
+    dependsOn test
+    executionData fileTree(layout.buildDirectory.get()).include("jacoco/*.exec")
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
 sonar {
 	properties {
-		property "sonar.projectKey", "advprog-2026-b11-project_bidmart-backend"
+		property "sonar.projectKey", "advprog-2026-b11-project_bidmart-backend-2"
 		property "sonar.organization", "advprog-2026-b11-project"
 	}
 }
@@ -80,3 +87,4 @@ pmd {
 	ruleSets = []
 	ruleSetFiles = files("config/pmd/ruleset.xml")
 }
+

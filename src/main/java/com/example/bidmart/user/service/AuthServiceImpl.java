@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,15 +55,14 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         validateNewUser(request.getUsername(), request.getEmail());
+        Role registrationRole = resolveRegistrationRole(request.getRole());
 
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
         user.setDisplayName(request.getDisplayName());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        Role defaultRole = roleRepository.findByName("USER")
-            .orElseThrow(() -> new IllegalStateException("Default role 'USER' tidak ditemukan di database."));
-        user.setRole(defaultRole);
+        user.setRole(registrationRole);
         user.setEmailVerified(false);
 
         String verificationToken = UUID.randomUUID().toString();
@@ -158,6 +158,19 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email is already registered.");
         }
+    }
+
+    private Role resolveRegistrationRole(String requestedRole) {
+        String roleName = (requestedRole == null || requestedRole.isBlank())
+                ? "USER"
+                : requestedRole.trim().toUpperCase(Locale.ROOT);
+
+        if (!roleName.equals("USER") && !roleName.equals("SELLER")) {
+            throw new IllegalArgumentException("Role must be USER or SELLER.");
+        }
+
+        return roleRepository.findByName(roleName)
+            .orElseThrow(() -> new IllegalStateException("Role '" + roleName + "' tidak ditemukan di database."));
     }
 
     private User findUserByIdentifier(String identifier) {

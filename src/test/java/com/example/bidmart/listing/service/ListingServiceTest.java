@@ -9,6 +9,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -260,6 +264,42 @@ class ListingServiceTest {
         listingService.getAllListings();
 
         verify(listingRepository, times(1)).findAll();
+    }
+
+    @Test
+    void getAllListings_withPageable_shouldReturnPage() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(listingRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(listing), pageable, 1));
+
+        Page<Listing> result = listingService.getAllListings(pageable);
+
+        assertEquals(1, result.getContent().size());
+        assertEquals(1, result.getTotalElements());
+        verify(listingRepository, times(1)).findAll(pageable);
+    }
+
+    @Test
+    void searchListings_withPageable_shouldReturnPage() {
+        Pageable pageable = PageRequest.of(0, 20);
+        UUID categoryId = UUID.randomUUID();
+        when(listingRepository.findBySearchCriteria("test", categoryId, null, null, pageable))
+                .thenReturn(new PageImpl<>(List.of(listing), pageable, 1));
+
+        Page<Listing> result = listingService.searchListings("test", categoryId.toString(), null, null, pageable);
+
+        assertEquals(1, result.getContent().size());
+        verify(listingRepository, times(1)).findBySearchCriteria("test", categoryId, null, null, pageable);
+    }
+
+    @Test
+    void getActiveListings_withPageable_shouldReturnPage() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(listingRepository.findActiveListings(pageable)).thenReturn(new PageImpl<>(List.of(listing), pageable, 1));
+
+        Page<Listing> result = listingService.getActiveListings(pageable);
+
+        assertEquals(1, result.getContent().size());
+        verify(listingRepository, times(1)).findActiveListings(pageable);
     }
 
     @Test
