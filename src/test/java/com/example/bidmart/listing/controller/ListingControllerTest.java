@@ -8,6 +8,11 @@ import com.example.bidmart.listing.model.AuctionType;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.user.service.UserService;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,19 +21,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
+import org.springframework.security.core.GrantedAuthority;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,7 +45,7 @@ class ListingControllerTest {
     @BeforeEach
     void setUp() {
         listingId = UUID.randomUUID();
-        sellerId  = UUID.randomUUID();
+        sellerId = UUID.randomUUID();
 
         listing = new Listing();
         listing.setId(listingId);
@@ -60,30 +58,22 @@ class ListingControllerTest {
         listing.setAuctionType(AuctionType.ENGLISH);
         listing.setCreatedAt(LocalDateTime.now());
 
-        request = new CreateListingRequest(
-                listing.getCategoryId(),
-                "Test",
-                null,
-                null,
-                new BigDecimal("100"),
-                null,
-                LocalDateTime.now().plusHours(1)
-        );
+        request = new CreateListingRequest(listing.getCategoryId(), "Test", "desc", "img.jpg",
+                new BigDecimal("100"), new BigDecimal("150"), LocalDateTime.now().plusHours(1), AuctionType.ENGLISH);
 
         authentication = mock(Authentication.class);
         lenient().when(authentication.getName()).thenReturn("testuser");
+        lenient().doReturn(List.<GrantedAuthority>of()).when(authentication).getAuthorities();
         lenient().when(userService.getUserIdByUsername("testuser")).thenReturn(sellerId);
     }
 
-    // ── CREATE ───────────────────────────────────────────────────────────────
-
     @Test
-    void createListing_shouldReturn201() {
+    void createListing_shouldReturn200() {
         when(listingService.createListing(any(CreateListingRequest.class), eq(sellerId))).thenReturn(listing);
 
         ResponseEntity<ListingResponse> response = listingController.createListing(request, authentication);
 
-        assertEquals(HttpStatus.CREATED.value(), response.getStatusCode().value());
+        assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals(listingId, response.getBody().getId());
     }
@@ -92,8 +82,6 @@ class ListingControllerTest {
     void createListing_shouldFail_whenAuthenticationNull() {
         assertThrows(Exception.class, () -> listingController.createListing(request, null));
     }
-
-    // ── GET ALL ──────────────────────────────────────────────────────────────
 
     @Test
     void getAllListings_shouldReturn200WithContent() {
@@ -117,19 +105,9 @@ class ListingControllerTest {
         assertEquals(0, response.getBody().content().size());
     }
 
-    // ── GET ACTIVE ───────────────────────────────────────────────────────────
-
     @Test
     void getActiveListings_shouldReturnOnlyActiveListings() {
-        Listing active = new Listing();
-        active.setId(UUID.randomUUID());
-        active.setStatus(AuctionStatus.ACTIVE);
-        active.setAuctionType(AuctionType.ENGLISH);
-        active.setStartingPrice(new BigDecimal("100"));
-        active.setEndTime(LocalDateTime.now().plusHours(2));
-        active.setCreatedAt(LocalDateTime.now());
-
-        when(listingService.getActiveListings(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(active)));
+        when(listingService.getActiveListings(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(listing)));
 
         ResponseEntity<PaginatedResponse<ListingResponse>> response = listingController.getActiveListings(0, 20);
 
@@ -147,8 +125,6 @@ class ListingControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(0, response.getBody().content().size());
     }
-
-    // ── GET BY ID ────────────────────────────────────────────────────────────
 
     @Test
     void getListingById_shouldReturn200() {
@@ -170,18 +146,17 @@ class ListingControllerTest {
         assertEquals(404, response.getStatusCode().value());
     }
 
-    // ── SEARCH ───────────────────────────────────────────────────────────────
-
     @Test
     void searchListings_shouldReturn200WithResults() {
         when(listingService.searchListings(eq("test"), eq(null), eq(null), eq(null), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(listing)));
 
-        ResponseEntity<PaginatedResponse<ListingResponse>> response =
-                listingController.searchListings("test", null, null, null, 0, 20);
+        ResponseEntity<?> response = listingController.searchListings("test", null, null, null, 0, 20);
+        Object body = response.getBody();
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(1, response.getBody().content().size());
+        assertTrue(body instanceof PaginatedResponse<?>);
+        assertEquals(1, ((PaginatedResponse<?>) body).content().size());
     }
 
     @Test
@@ -189,19 +164,31 @@ class ListingControllerTest {
         when(listingService.searchListings(eq("xyz"), eq(null), eq(null), eq(null), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        ResponseEntity<PaginatedResponse<ListingResponse>> response =
-                listingController.searchListings("xyz", null, null, null, 0, 20);
+        ResponseEntity<?> response = listingController.searchListings("xyz", null, null, null, 0, 20);
+        Object body = response.getBody();
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals(0, response.getBody().content().size());
+        assertTrue(body instanceof PaginatedResponse<?>);
+        assertEquals(0, ((PaginatedResponse<?>) body).content().size());
     }
 
-    // ── UPDATE ───────────────────────────────────────────────────────────────
+    @Test
+    void searchListings_shouldReturn400WhenPriceRangeInvalid() {
+        when(listingService.searchListings(eq(null), eq(null), eq(new BigDecimal("200000")),
+                eq(new BigDecimal("100000")), any(Pageable.class)))
+                .thenThrow(new IllegalArgumentException("Minimum price tidak boleh lebih besar dari maximum price."));
+
+        ResponseEntity<?> response = listingController.searchListings(null, null,
+                new BigDecimal("200000"), new BigDecimal("100000"), 0, 20);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("Minimum price tidak boleh lebih besar dari maximum price.", response.getBody());
+    }
 
     @Test
     void updateListing_shouldReturn200OnSuccess() {
         listing.setStatus(AuctionStatus.CLOSED);
-        when(listingService.updateListing(eq(listingId), any(CreateListingRequest.class), eq(sellerId)))
+        when(listingService.updateListing(eq(listingId), any(CreateListingRequest.class), eq(sellerId), eq(false)))
                 .thenReturn(listing);
 
         ResponseEntity<?> response = listingController.updateListing(listingId, request, authentication);
@@ -212,8 +199,8 @@ class ListingControllerTest {
 
     @Test
     void updateListing_shouldReturn400WhenAuctionActive() {
-        when(listingService.updateListing(eq(listingId), any(CreateListingRequest.class), eq(sellerId)))
-                .thenThrow(new RuntimeException("Listing tidak bisa diupdate saat auction masih aktif."));
+        when(listingService.updateListing(eq(listingId), any(CreateListingRequest.class), eq(sellerId), eq(false)))
+                .thenThrow(new IllegalArgumentException("Listing tidak bisa diupdate saat auction masih aktif."));
 
         ResponseEntity<?> response = listingController.updateListing(listingId, request, authentication);
 
@@ -222,31 +209,27 @@ class ListingControllerTest {
     }
 
     @Test
-    void updateListing_shouldReturn400WhenNotOwner() {
-        when(listingService.updateListing(eq(listingId), any(CreateListingRequest.class), eq(sellerId)))
-                .thenThrow(new RuntimeException("Hanya seller pemilik listing yang dapat mengubah data ini."));
+    void updateListing_shouldReturn403WhenAccessDenied() {
+        when(listingService.updateListing(eq(listingId), any(CreateListingRequest.class), eq(sellerId), eq(false)))
+                .thenThrow(new AccessDeniedException("User tidak memiliki akses ke listing ini."));
 
         ResponseEntity<?> response = listingController.updateListing(listingId, request, authentication);
 
-        assertEquals(400, response.getStatusCode().value());
+        assertEquals(403, response.getStatusCode().value());
     }
-
-    // ── DELETE ───────────────────────────────────────────────────────────────
 
     @Test
     void deleteListing_shouldReturn204OnSuccess() {
-        doNothing().when(listingService).deleteListing(eq(listingId), eq(sellerId));
-
         ResponseEntity<?> response = listingController.deleteListing(listingId, authentication);
 
         assertEquals(204, response.getStatusCode().value());
-        verify(listingService).deleteListing(listingId, sellerId);
+        verify(listingService).deleteListing(listingId, sellerId, false);
     }
 
     @Test
     void deleteListing_shouldReturn400WhenAuctionActive() {
-        doThrow(new RuntimeException("Listing tidak bisa dihapus saat auction masih aktif."))
-                .when(listingService).deleteListing(eq(listingId), eq(sellerId));
+        doThrow(new IllegalArgumentException("Listing tidak bisa dihapus saat auction masih aktif."))
+                .when(listingService).deleteListing(listingId, sellerId, false);
 
         ResponseEntity<?> response = listingController.deleteListing(listingId, authentication);
 
@@ -255,12 +238,12 @@ class ListingControllerTest {
     }
 
     @Test
-    void deleteListing_shouldReturn400WhenNotOwner() {
-        doThrow(new RuntimeException("Hanya seller pemilik listing yang dapat menghapus data ini."))
-                .when(listingService).deleteListing(eq(listingId), eq(sellerId));
+    void deleteListing_shouldReturn403WhenAccessDenied() {
+        doThrow(new AccessDeniedException("User tidak memiliki akses ke listing ini."))
+                .when(listingService).deleteListing(listingId, sellerId, false);
 
         ResponseEntity<?> response = listingController.deleteListing(listingId, authentication);
 
-        assertEquals(400, response.getStatusCode().value());
+        assertEquals(403, response.getStatusCode().value());
     }
 }

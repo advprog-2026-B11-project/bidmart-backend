@@ -13,6 +13,9 @@ import java.util.UUID;
 public interface WalletRepository extends JpaRepository<Wallet, UUID> {
     Optional<Wallet> findByUserId(UUID userId);
 
+    boolean existsByUserId(UUID userId);
+    boolean existsByIdAndUserId(UUID id, UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Wallet w WHERE w.userId = :userId")
     Optional<Wallet> findByUserIdWithLock(@Param("userId") UUID userId);
