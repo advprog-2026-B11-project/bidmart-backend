@@ -22,12 +22,10 @@ public class RegisterRequest {
     @NotBlank(message = "Display name cannot be empty")
     private String displayName;
 
-    @Pattern(regexp = "(?i)USER|SELLER", message = "Role must be USER or SELLER")
+    @Pattern(regexp = "(?i)BUYER|SELLER", message = "Role must be BUYER or SELLER")
     private String role;
 
     @NotBlank(message = "Password cannot be empty")
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
-
-    private String role;
 }

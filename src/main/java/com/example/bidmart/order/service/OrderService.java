@@ -47,6 +47,10 @@ public class OrderService {
         return orderRepository.findByBuyerIdOrSellerId(userId, userId);
     }
 
+    public List<Order> getOrdersByBuyer(UUID buyerId) {
+        return orderRepository.findByBuyerId(buyerId);
+    }
+
     @Transactional
     public Order updateOrderStatus(UUID orderId, String newStatusStr) {
         Order order = getOrderOrThrow(orderId);
