@@ -266,6 +266,20 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    @Transactional
+    public void completeOrderPayment(UUID orderId, UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount) {
+        String referenceId = listingId.toString();
+        settlePayment(buyerId, amount, referenceId, "order-settle-" + orderId);
+        confirmDelivery(sellerId, amount, referenceId, "order-income-" + orderId);
+    }
+
+    @Override
+    @Transactional
+    public void refundOrderPayment(UUID orderId, UUID listingId, UUID buyerId, BigDecimal amount) {
+        releaseBidFunds(buyerId, listingId, amount, "order-refund-" + orderId);
+    }
+
+    @Override
     public List<Transaction> getTransactionHistory(UUID userId) {
         if (!walletRepository.existsByUserId(userId)) {
             throw new WalletNotFoundException("Wallet tidak ditemukan.");

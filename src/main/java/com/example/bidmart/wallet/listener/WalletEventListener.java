@@ -2,6 +2,8 @@ package com.example.bidmart.wallet.listener;
 
 import com.example.bidmart.common.event.UserDeactivatedEvent;
 import com.example.bidmart.common.event.UserRegisteredEvent;
+import com.example.bidmart.common.event.OrderDeliveredEvent;
+import com.example.bidmart.common.event.OrderRefundedEvent;
 import com.example.bidmart.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +41,43 @@ public class WalletEventListener {
             log.info("All holds released for deactivated user: userId={}", event.userId());
         } catch (Exception e) {
             log.error("Error releasing holds for deactivated user: userId={}", event.userId(), e);
+        }
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleOrderDelivered(OrderDeliveredEvent event) {
+        try {
+            log.info("Completing order payment: orderId={}, buyerId={}, sellerId={}, amount={}",
+                    event.getOrderId(), event.getBuyerId(), event.getSellerId(), event.getAmount());
+            walletService.completeOrderPayment(
+                    event.getOrderId(),
+                    event.getListingId(),
+                    event.getBuyerId(),
+                    event.getSellerId(),
+                    event.getAmount()
+            );
+            log.info("Order payment completed: orderId={}", event.getOrderId());
+        } catch (Exception e) {
+            log.error("Error completing order payment: orderId={}", event.getOrderId(), e);
+        }
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleOrderRefunded(OrderRefundedEvent event) {
+        try {
+            log.info("Refunding order payment: orderId={}, buyerId={}, amount={}",
+                    event.getOrderId(), event.getBuyerId(), event.getAmount());
+            walletService.refundOrderPayment(
+                    event.getOrderId(),
+                    event.getListingId(),
+                    event.getBuyerId(),
+                    event.getAmount()
+            );
+            log.info("Order payment refunded: orderId={}", event.getOrderId());
+        } catch (Exception e) {
+            log.error("Error refunding order payment: orderId={}", event.getOrderId(), e);
         }
     }
 }

@@ -85,6 +85,41 @@ class OrderServiceTest {
     }
 
     @Test
+    void updateOrderStatus_toDelivered_publishesDeliveredEvent() {
+        order.setStatus(OrderStatus.SHIPPED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        Order result = orderService.updateOrderStatus(orderId, "DELIVERED");
+
+        assertEquals(OrderStatus.DELIVERED, result.getStatus());
+        verify(eventPublisher).publishEvent(any(OrderDeliveredEvent.class));
+    }
+
+    @Test
+    void updateOrderStatus_toCancelled_publishesRefundedEvent() {
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        Order result = orderService.updateOrderStatus(orderId, "CANCELLED");
+
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        verify(eventPublisher).publishEvent(any(OrderRefundedEvent.class));
+    }
+
+    @Test
+    void updateOrderStatus_sameStatus_doesNotPublishWalletEvent() {
+        order.setStatus(OrderStatus.SHIPPED);
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+
+        Order result = orderService.updateOrderStatus(orderId, "SHIPPED");
+
+        assertEquals(OrderStatus.SHIPPED, result.getStatus());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     void updateOrderStatus_invalidTransition_throwsException() {
         order.setStatus(OrderStatus.DELIVERED);
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
