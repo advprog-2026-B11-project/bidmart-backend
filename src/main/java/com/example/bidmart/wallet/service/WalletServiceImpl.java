@@ -267,17 +267,21 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public List<Transaction> getTransactionHistory(UUID userId) {
-        Wallet wallet = getWalletByUserId(userId);
-        return transactionRepository.findByWalletIdOrderByCreatedAtDesc(wallet.getId());
+        if (!walletRepository.existsByUserId(userId)) {
+            throw new WalletNotFoundException("Wallet tidak ditemukan.");
+        }
+        return transactionRepository.findByUserId(userId);
     }
 
     @Override
     public Transaction getTransactionById(UUID transactionId, UUID userId) {
-        Wallet wallet = getWalletByUserId(userId);
+        if (!walletRepository.existsByUserId(userId)) {
+            throw new WalletNotFoundException("Wallet tidak ditemukan.");
+        }
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new InvalidRequestException("Transaksi tidak ditemukan."));
 
-        if (!transaction.getWalletId().equals(wallet.getId())) {
+        if (!walletRepository.existsByIdAndUserId(transaction.getWalletId(), userId)) {
             throw new UnauthorizedException("Anda tidak memiliki akses ke transaksi ini.");
         }
 
@@ -363,18 +367,8 @@ public class WalletServiceImpl implements WalletService {
     }
 
     private BigDecimal calculateHeldForReference(UUID walletId, String referenceId) {
-        List<Transaction> txs = transactionRepository.findByWalletIdAndReferenceId(walletId, referenceId);
-
-        BigDecimal held = BigDecimal.ZERO;
-        for (Transaction tx : txs) {
-            if (TransactionType.HOLD.equals(tx.getType())) {
-                held = held.add(tx.getAmount());
-            } else if (TransactionType.REFUND.equals(tx.getType()) || TransactionType.PAYMENT.equals(tx.getType())) {
-                held = held.subtract(tx.getAmount());
-            }
-        }
-
-        return held.max(BigDecimal.ZERO);
+        BigDecimal netHeld = transactionRepository.calculateNetHeldAmount(walletId, referenceId);
+        return netHeld.max(BigDecimal.ZERO);
     }
 
     private Optional<Wallet> checkIdempotency(String idempotencyKey, UUID userId) {
