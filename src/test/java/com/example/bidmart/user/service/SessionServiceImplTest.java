@@ -2,6 +2,7 @@ package com.example.bidmart.user.service;
 
 import com.example.bidmart.user.dto.SessionResponse;
 import com.example.bidmart.user.model.Session;
+import com.example.bidmart.user.model.SessionOverflowPolicy;
 import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
@@ -137,5 +138,58 @@ class SessionServiceImplTest {
         sessionService.revokeAllSessions(user);
 
         verify(sessionRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void enforceSessionLimit_rejectNewPolicy_exceedsLimit_throws() {
+        SessionServiceImpl rejectService = new SessionServiceImpl(
+                sessionRepository, userRepository, SessionOverflowPolicy.REJECT_NEW);
+
+        Session s1 = new Session();
+        Session s2 = new Session();
+        when(sessionRepository.findByUserIdAndIsRevokedFalseOrderByCreatedAtAsc(userId))
+                .thenReturn(List.of(s1, s2));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> rejectService.enforceSessionLimit(user, 2));
+        verify(sessionRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void enforceSessionLimit_rejectNewPolicy_withinLimit_doesNothing() {
+        SessionServiceImpl rejectService = new SessionServiceImpl(
+                sessionRepository, userRepository, SessionOverflowPolicy.REJECT_NEW);
+
+        when(sessionRepository.findByUserIdAndIsRevokedFalseOrderByCreatedAtAsc(userId))
+                .thenReturn(List.of(session));
+
+        rejectService.enforceSessionLimit(user, 2);
+
+        verify(sessionRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void getActiveSessions_userNotFound_throws() {
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> sessionService.getActiveSessions("unknown"));
+    }
+
+    @Test
+    void revokeSession_userNotFound_throws() {
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> sessionService.revokeSession("unknown", sessionId));
+    }
+
+    @Test
+    void revokeSession_sessionNotFound_throws() {
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(sessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> sessionService.revokeSession("testuser", sessionId));
     }
 }
