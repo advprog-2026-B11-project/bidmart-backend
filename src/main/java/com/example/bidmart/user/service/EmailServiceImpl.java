@@ -40,10 +40,12 @@ public class EmailServiceImpl implements EmailService {
             helper.setTo(toEmail);
             helper.setSubject(verificationSubject);
             helper.setText(buildVerificationEmailBody(verificationUrl), true);
+            mailSender.send(message);
         } catch (MessagingException e) {
             throw new IllegalStateException("Failed to compose verification email.", e);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to send verification email to " + toEmail, e);
         }
-        mailSender.send(message);
     }
 
     @Async
@@ -59,10 +61,12 @@ public class EmailServiceImpl implements EmailService {
             helper.setTo(toEmail);
             helper.setSubject(mfaSubject);
             helper.setText(buildMfaCodeEmailBody(code), true);
+            mailSender.send(message);
         } catch (MessagingException e) {
             throw new IllegalStateException("Failed to compose MFA code email.", e);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to send MFA code email to " + toEmail, e);
         }
-        mailSender.send(message);
     }
 
     private String buildVerificationEmailBody(String verificationUrl) {
