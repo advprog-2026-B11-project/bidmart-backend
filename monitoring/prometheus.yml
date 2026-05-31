@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  # Backend BidMart yang sudah dideploy di Render
+  - job_name: 'bidmart-backend-render'
+    metrics_path: '/actuator/prometheus'
+    scheme: https
+    static_configs:
+      - targets: ['bidmart-backend-wn6p.onrender.com']
+        labels:
+          env: 'production'
+
+  # Opsional: backend lokal saat development (jalan via gradlew bootRun)
+  # Aktifkan kalau ingin monitor instance lokal. Di Docker Desktop (Windows/Mac),
+  # host.docker.internal menunjuk ke localhost laptop kamu.
+  # - job_name: 'bidmart-backend-local'
+  #   metrics_path: '/actuator/prometheus'
+  #   scheme: http
+  #   static_configs:
+  #     - targets: ['host.docker.internal:8080']
+  #       labels:
+  #         env: 'local'
