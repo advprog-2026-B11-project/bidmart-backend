@@ -2,6 +2,7 @@ package com.example.bidmart.user.service;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
@@ -24,13 +25,25 @@ public class EmailServiceImpl implements EmailService {
     private final String verificationSubject;
     private final String mfaSubject;
 
-    public EmailServiceImpl(RestClient.Builder restClientBuilder,
-                            @Value("${app.email.brevo.api-key:}") String brevoApiKey,
+    @Autowired
+    public EmailServiceImpl(@Value("${app.email.brevo.api-key:}") String brevoApiKey,
                             @Value("${app.email.brevo.url:https://api.brevo.com/v3/smtp/email}") String brevoUrl,
                             @Value("${app.email.from}") String fromAddress,
                             @Value("${app.email.from-name:BidMart}") String fromName,
                             @Value("${app.email.verification-subject:Verify your BidMart account}") String verificationSubject,
                             @Value("${app.email.mfa-subject:Your BidMart login code}") String mfaSubject) {
+        this(RestClient.builder(), brevoApiKey, brevoUrl, fromAddress, fromName,
+                verificationSubject, mfaSubject);
+    }
+
+    // Package-private: lets tests inject a builder bound to MockRestServiceServer.
+    EmailServiceImpl(RestClient.Builder restClientBuilder,
+                     String brevoApiKey,
+                     String brevoUrl,
+                     String fromAddress,
+                     String fromName,
+                     String verificationSubject,
+                     String mfaSubject) {
         this.restClient = restClientBuilder
                 .baseUrl(brevoUrl)
                 .defaultHeader("api-key", brevoApiKey)
