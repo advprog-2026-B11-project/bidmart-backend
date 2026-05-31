@@ -128,7 +128,7 @@ class RoleControllerTest {
     @Test
     void listRoles_shouldReturnOk() {
         Role role = new Role();
-        role.setName("BUYER");
+        role.setName("USER");
         role.setPermissions(new HashSet<>());
         when(roleRepository.findAll()).thenReturn(List.of(role));
 

@@ -51,7 +51,7 @@ class UserServiceImplTest {
                 userRepository, sessionRepository, eventPublisher,
                 mfaService, passwordEncoder, emailService, 300L);
 
-        Role role = new Role(UUID.randomUUID(), "BUYER", new HashSet<>());
+        Role role = new Role(UUID.randomUUID(), "USER", new HashSet<>());
         user = new User();
         user.setId(UUID.randomUUID());
         user.setUsername("testuser");
@@ -71,7 +71,7 @@ class UserServiceImplTest {
 
         assertEquals("testuser", resp.getUsername());
         assertEquals("test@example.com", resp.getEmail());
-        assertEquals("BUYER", resp.getRole());
+        assertEquals("USER", resp.getRole());
     }
 
     @Test
@@ -390,12 +390,12 @@ class UserServiceImplTest {
     @Test
     void listUsers_withFilters_trimsThenQueries() {
         Page<User> page = new PageImpl<>(List.of());
-        when(userRepository.findAllWithFilters("query", "BUYER", Pageable.unpaged()))
+        when(userRepository.findAllWithFilters("query", "USER", Pageable.unpaged()))
                 .thenReturn(page);
 
-        userService.listUsers("  query  ", "  BUYER  ", Pageable.unpaged());
+        userService.listUsers("  query  ", "  USER  ", Pageable.unpaged());
 
-        verify(userRepository).findAllWithFilters("query", "BUYER", Pageable.unpaged());
+        verify(userRepository).findAllWithFilters("query", "USER", Pageable.unpaged());
     }
 
     @Test
