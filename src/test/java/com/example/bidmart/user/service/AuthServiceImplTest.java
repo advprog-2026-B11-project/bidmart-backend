@@ -53,7 +53,7 @@ class AuthServiceImplTest {
 
     private User buildUser() {
         Role role = new Role();
-        role.setName("BUYER");
+        role.setName("USER");
         User user = new User();
         user.setId(UUID.randomUUID());
         user.setUsername("alice");
@@ -90,15 +90,15 @@ class AuthServiceImplTest {
     void register_success() {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("alice"); req.setEmail("alice@example.com");
-        req.setDisplayName("Alice"); req.setPassword("password1"); req.setRole("BUYER");
+        req.setDisplayName("Alice"); req.setPassword("password1"); req.setRole("USER");
 
-        Role role = new Role(); role.setName("BUYER");
+        Role role = new Role(); role.setName("USER");
         User saved = buildUser();
 
         when(userRepository.existsByUsername("alice")).thenReturn(false);
         when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password1")).thenReturn("encoded");
-        when(roleRepository.findByName("BUYER")).thenReturn(Optional.of(role));
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(role));
         when(userRepository.save(any(User.class))).thenReturn(saved);
 
         AuthResponse resp = authService.register(req);
@@ -137,17 +137,17 @@ class AuthServiceImplTest {
         req.setUsername("alice"); req.setEmail("alice@example.com");
         req.setDisplayName("Alice"); req.setPassword("password1"); req.setRole(null);
 
-        Role role = new Role(); role.setName("BUYER");
+        Role role = new Role(); role.setName("USER");
         User saved = buildUser();
 
         when(userRepository.existsByUsername("alice")).thenReturn(false);
         when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password1")).thenReturn("encoded");
-        when(roleRepository.findByName("BUYER")).thenReturn(Optional.of(role));
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(role));
         when(userRepository.save(any(User.class))).thenReturn(saved);
 
         AuthResponse resp = authService.register(req);
-        assertEquals("BUYER", resp.getRole());
+        assertEquals("USER", resp.getRole());
     }
 
     @Test
@@ -193,13 +193,13 @@ class AuthServiceImplTest {
         req.setUsername("alice"); req.setEmail("alice@example.com");
         req.setDisplayName("Alice"); req.setPassword("password1");
 
-        Role role = new Role(); role.setName("BUYER");
+        Role role = new Role(); role.setName("USER");
         User saved = buildUser();
 
         when(userRepository.existsByUsername("alice")).thenReturn(false);
         when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password1")).thenReturn("encoded");
-        when(roleRepository.findByName("BUYER")).thenReturn(Optional.of(role));
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(role));
         when(userRepository.save(any(User.class))).thenReturn(saved);
 
         authService.register(req);
