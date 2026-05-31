@@ -1,68 +1,88 @@
 package com.example.bidmart.user.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
+/**
+ * Sends transactional email through the Brevo HTTP API instead of SMTP.
+ *
+ * <p>Render's free tier blocks the outbound SMTP ports (587/465), so every SMTP-based
+ * provider fails in production. Brevo's REST endpoint runs over HTTPS (port 443), which
+ * is not blocked, and only requires a single verified sender address (no custom domain).
+ */
 @Service
 public class EmailServiceImpl implements EmailService {
 
-    private final JavaMailSender mailSender;
+    private final RestClient restClient;
     private final String fromAddress;
+    private final String fromName;
     private final String verificationSubject;
     private final String mfaSubject;
 
-    public EmailServiceImpl(JavaMailSender mailSender,
+    @Autowired
+    public EmailServiceImpl(@Value("${app.email.brevo.api-key:}") String brevoApiKey,
+                            @Value("${app.email.brevo.url:https://api.brevo.com/v3/smtp/email}") String brevoUrl,
                             @Value("${app.email.from}") String fromAddress,
+                            @Value("${app.email.from-name:BidMart}") String fromName,
                             @Value("${app.email.verification-subject:Verify your BidMart account}") String verificationSubject,
                             @Value("${app.email.mfa-subject:Your BidMart login code}") String mfaSubject) {
-        this.mailSender = mailSender;
+        this(RestClient.builder(), brevoApiKey, brevoUrl, fromAddress, fromName,
+                verificationSubject, mfaSubject);
+    }
+
+    // Package-private: lets tests inject a builder bound to MockRestServiceServer.
+    EmailServiceImpl(RestClient.Builder restClientBuilder,
+                     String brevoApiKey,
+                     String brevoUrl,
+                     String fromAddress,
+                     String fromName,
+                     String verificationSubject,
+                     String mfaSubject) {
+        this.restClient = restClientBuilder
+                .baseUrl(brevoUrl)
+                .defaultHeader("api-key", brevoApiKey)
+                .defaultHeader("accept", MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader("content-type", MediaType.APPLICATION_JSON_VALUE)
+                .build();
         this.fromAddress = fromAddress;
+        this.fromName = fromName;
         this.verificationSubject = verificationSubject;
         this.mfaSubject = mfaSubject;
     }
-    
+
     @Async
     @Override
     public void sendVerificationEmail(String toEmail, String verificationUrl) {
-        MimeMessage message = mailSender.createMimeMessage();
-        try {
-            MimeMessageHelper helper = new MimeMessageHelper(
-                message,
-                MimeMessageHelper.MULTIPART_MODE_NO,
-                StandardCharsets.UTF_8.name());
-            helper.setFrom(fromAddress);
-            helper.setTo(toEmail);
-            helper.setSubject(verificationSubject);
-            helper.setText(buildVerificationEmailBody(verificationUrl), true);
-        } catch (MessagingException e) {
-            throw new IllegalStateException("Failed to compose verification email.", e);
-        }
-        mailSender.send(message);
+        sendEmail(toEmail, verificationSubject, buildVerificationEmailBody(verificationUrl),
+                "verification email");
     }
 
     @Async
     @Override
     public void sendMfaCodeEmail(String toEmail, String code) {
-        MimeMessage message = mailSender.createMimeMessage();
+        sendEmail(toEmail, mfaSubject, buildMfaCodeEmailBody(code), "MFA code email");
+    }
+
+    private void sendEmail(String toEmail, String subject, String htmlContent, String description) {
+        Map<String, Object> payload = Map.of(
+                "sender", Map.of("name", fromName, "email", fromAddress),
+                "to", List.of(Map.of("email", toEmail)),
+                "subject", subject,
+                "htmlContent", htmlContent);
         try {
-            MimeMessageHelper helper = new MimeMessageHelper(
-                message,
-                MimeMessageHelper.MULTIPART_MODE_NO,
-                StandardCharsets.UTF_8.name());
-            helper.setFrom(fromAddress);
-            helper.setTo(toEmail);
-            helper.setSubject(mfaSubject);
-            helper.setText(buildMfaCodeEmailBody(code), true);
-        } catch (MessagingException e) {
-            throw new IllegalStateException("Failed to compose MFA code email.", e);
+            restClient.post()
+                    .body(payload)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to send " + description + " to " + toEmail, e);
         }
-        mailSender.send(message);
     }
 
     private String buildVerificationEmailBody(String verificationUrl) {
