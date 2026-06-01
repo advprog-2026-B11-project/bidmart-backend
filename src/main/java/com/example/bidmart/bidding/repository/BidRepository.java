@@ -18,6 +18,6 @@ public interface BidRepository extends JpaRepository<Bid, UUID> {
 
     Optional<Bid> findTopByListingIdAndBuyerIdOrderByCreatedAtDesc(UUID listingId, UUID buyerId);
 
-    Optional<Bid> findTopByListingIdAndProxyBidTrueAndBuyerIdNotOrderByProxyMaxLimitDescCreatedAtAsc(
+    Optional<Bid> findTopByListingIdAndProxyBidIsTrueAndBuyerIdNotOrderByProxyMaxLimitDescCreatedAtAsc(
             UUID listingId, UUID buyerId);
 }
