@@ -228,8 +228,7 @@ public class BidService {
 
         while (true) {
             Optional<Bid> rivalOpt = bidRepository
-                    .findTopByListingIdAndProxyBidTrueAndBuyerIdNotOrderByProxyMaxLimitDescCreatedAtAsc(
-                            listingEntity.getId(), currentWinner.getBuyerId());
+                    .findTopRivalProxyBid(listingEntity.getId(), currentWinner.getBuyerId());
 
             if (rivalOpt.isEmpty()) {
                 break;
