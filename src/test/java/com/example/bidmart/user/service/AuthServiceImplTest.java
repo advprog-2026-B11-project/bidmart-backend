@@ -12,12 +12,14 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import com.example.bidmart.common.event.UserRegisteredEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
@@ -39,6 +41,7 @@ class AuthServiceImplTest {
     @Mock private MfaService mfaService;
     @Mock private RoleRepository roleRepository;
     @Mock private EmailService emailService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private AuthServiceImpl authService;
 
@@ -46,7 +49,7 @@ class AuthServiceImplTest {
     void setUp() {
         authService = new AuthServiceImpl(
             userRepository, sessionRepository, passwordEncoder, jwtService,
-            sessionService, mfaService, roleRepository, emailService,
+            sessionService, mfaService, roleRepository, emailService, eventPublisher,
             "http://example.com/verify/{token}", 300L, 3
         );
     }
@@ -106,6 +109,13 @@ class AuthServiceImplTest {
         assertEquals("alice", resp.getUsername());
         assertNull(resp.getAccessToken());
         verify(emailService).sendVerificationEmail(eq("alice@example.com"), anyString());
+
+        // Registration must publish UserRegisteredEvent so the wallet module
+        // auto-provisions a wallet for the new user (buyer & seller alike).
+        ArgumentCaptor<UserRegisteredEvent> eventCaptor = ArgumentCaptor.forClass(UserRegisteredEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(saved.getId(), eventCaptor.getValue().userId());
+        assertEquals("alice", eventCaptor.getValue().username());
     }
 
     @Test
@@ -185,7 +195,7 @@ class AuthServiceImplTest {
     void register_urlWithoutPlaceholder_appendsToken() {
         authService = new AuthServiceImpl(
             userRepository, sessionRepository, passwordEncoder, jwtService,
-            sessionService, mfaService, roleRepository, emailService,
+            sessionService, mfaService, roleRepository, emailService, eventPublisher,
             "http://example.com/verify?token=", 300L, 3
         );
 

@@ -15,6 +15,7 @@ import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,7 @@ public class AuthServiceImpl implements AuthService {
     private final MfaService mfaService;
     private final RoleRepository roleRepository;
     private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
     private final String verificationUrlTemplate;
     private final long emailMfaCodeTtlSeconds;
     private final int maxConcurrentSessions;
@@ -59,6 +61,7 @@ public class AuthServiceImpl implements AuthService {
                             MfaService mfaService,
                             RoleRepository roleRepository,
                             EmailService emailService,
+                            ApplicationEventPublisher eventPublisher,
                             @Value("${app.email.verification-url-template}") String verificationUrlTemplate,
                             @Value("${app.mfa.email-code-ttl-seconds:300}") long emailMfaCodeTtlSeconds,
                             @Value("${app.session.max-concurrent:3}") int maxConcurrentSessions) {
@@ -70,6 +73,7 @@ public class AuthServiceImpl implements AuthService {
         this.mfaService = mfaService;
         this.roleRepository = roleRepository;
         this.emailService = emailService;
+        this.eventPublisher = eventPublisher;
         this.verificationUrlTemplate = verificationUrlTemplate;
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
         this.maxConcurrentSessions = maxConcurrentSessions;
@@ -84,6 +88,7 @@ public class AuthServiceImpl implements AuthService {
                            MfaService mfaService,
                            RoleRepository roleRepository,
                            EmailService emailService,
+                           ApplicationEventPublisher eventPublisher,
                            String verificationUrlTemplate) {
         this(userRepository,
                 sessionRepository,
@@ -93,6 +98,7 @@ public class AuthServiceImpl implements AuthService {
                 mfaService,
                 roleRepository,
                 emailService,
+                eventPublisher,
                 verificationUrlTemplate,
                 DEFAULT_EMAIL_MFA_TTL_SECONDS,
                 DEFAULT_MAX_CONCURRENT_SESSIONS);
@@ -118,6 +124,12 @@ public class AuthServiceImpl implements AuthService {
         user.setVerificationToken(verificationToken);
 
         User savedUser = userRepository.save(user);
+
+        // Auto-provision a wallet for every new user (buyer & seller alike). The
+        // WalletEventListener handles UserRegisteredEvent AFTER_COMMIT, so the wallet
+        // is created once registration successfully commits.
+        eventPublisher.publishEvent(new UserRegisteredEvent(
+                savedUser.getId(), savedUser.getUsername(), Instant.now()));
 
         sendVerificationEmail(savedUser, verificationToken);
 
