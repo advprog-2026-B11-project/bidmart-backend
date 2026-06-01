@@ -118,9 +118,16 @@ public class BidService {
             extended = true;
         }
 
+        // Resolve proxy counter-bids before persisting the listing so the listing
+        // is saved exactly once with the final highest-bid state.
+        BidResponse finalResult = resolveProxies(savedBid, listingEntity);
+
         listingService.save(listingEntity);
 
-        releaseOutbidFunds(currentHighestBid, savedBid)
+        // Only release the previous highest bidder's funds here if they held a normal
+        // (non-proxy) bid.  Proxy bids are fully managed inside resolveProxies to
+        // avoid double-releases.
+        releaseOutbidFunds(currentHighestBid, savedBid, finalResult.buyerId())
                 .ifPresent(outbid -> eventPublisher.publishEvent(
                         new OutbidEvent(savedBid.getListingId(), outbid.getBuyerId(), savedBid.getAmount())));
 
@@ -206,7 +213,75 @@ public class BidService {
         );
     }
 
-    private Optional<Bid> releaseOutbidFunds(Optional<Bid> previousHighestBid, Bid newBid) {
+    /**
+     * Iteratively resolves proxy counter-bids after a new bid lands.
+     * Updates listing's highest-bid state in memory; caller persists the listing.
+     *
+     * Fund-release contract:
+     *  - Normal bid outbid       → released immediately (no proxy to counter back).
+     *  - Proxy bid outbid        → NOT released mid-loop; only released when exhausted.
+     *  - Rival proxy exhausted   → released at the break point.
+     *  - Winner's held funds     → kept (auction-settlement releases any surplus).
+     */
+    private BidResponse resolveProxies(Bid incomingBid, Listing listingEntity) {
+        Bid currentWinner = incomingBid;
+
+        while (true) {
+            Optional<Bid> rivalOpt = bidRepository
+                    .findTopByListingIdAndProxyBidTrueAndBuyerIdNotOrderByProxyMaxLimitDescCreatedAtAsc(
+                            listingEntity.getId(), currentWinner.getBuyerId());
+
+            if (rivalOpt.isEmpty()) {
+                break;
+            }
+
+            Bid rival = rivalOpt.get();
+            BigDecimal counterAmount = currentWinner.getAmount().add(BigDecimal.ONE);
+
+            if (rival.getProxyMaxLimit().compareTo(counterAmount) < 0) {
+                // Rival proxy exhausted — release their held funds and stop.
+                walletService.releaseBidFunds(
+                        rival.getBuyerId(), rival.getListingId(), rival.getProxyMaxLimit());
+                eventPublisher.publishEvent(new OutbidEvent(
+                        listingEntity.getId(), rival.getBuyerId(), currentWinner.getAmount()));
+                break;
+            }
+
+            // Rival proxy fires a counter-bid.
+            Bid counter = new Bid();
+            counter.setListingId(rival.getListingId());
+            counter.setBuyerId(rival.getBuyerId());
+            counter.setAmount(counterAmount);
+            counter.setProxyBid(true);
+            counter.setProxyMaxLimit(rival.getProxyMaxLimit());
+            Bid savedCounter = bidRepository.save(counter);
+
+            listingEntity.updateHighestBid(savedCounter.getBuyerId(), savedCounter.getAmount());
+
+            // Release currentWinner's funds only if they have no proxy to fight back with.
+            // Proxy holders keep their funds until they are truly eliminated.
+            if (!Boolean.TRUE.equals(currentWinner.getProxyBid())) {
+                walletService.releaseBidFunds(
+                        currentWinner.getBuyerId(),
+                        currentWinner.getListingId(),
+                        currentWinner.getAmount());
+                eventPublisher.publishEvent(new OutbidEvent(
+                        listingEntity.getId(), currentWinner.getBuyerId(), savedCounter.getAmount()));
+            }
+
+            eventPublisher.publishEvent(new BidPlacedEvent(
+                    savedCounter.getId(), listingEntity.getId(),
+                    savedCounter.getBuyerId(), savedCounter.getAmount()));
+
+            currentWinner = savedCounter;
+        }
+
+        return BidResponse.from(currentWinner);
+    }
+
+    private Optional<Bid> releaseOutbidFunds(Optional<Bid> previousHighestBid,
+                                              Bid newBid,
+                                              UUID finalWinnerBuyerId) {
         if (previousHighestBid.isEmpty()) {
             return Optional.empty();
         }
@@ -214,6 +289,14 @@ public class BidService {
         Bid previous = previousHighestBid.get();
 
         if (previous.getBuyerId().equals(newBid.getBuyerId())) {
+            return Optional.empty();
+        }
+
+        if (Boolean.TRUE.equals(previous.getProxyBid())) {
+            return Optional.empty();
+        }
+
+        if (previous.getBuyerId().equals(finalWinnerBuyerId)) {
             return Optional.empty();
         }
 
