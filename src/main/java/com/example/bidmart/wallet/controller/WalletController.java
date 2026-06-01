@@ -57,7 +57,7 @@ public class WalletController {
         return getBalance(authentication);
     }
 
-    @PostMapping("/{userId}/top-up")
+    @PostMapping({"/{userId}/top-up", "/topup", "/top-up"})
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_TOP_UP)")
     public ResponseEntity<WalletResponse> topUp(
             @PathVariable(name = "userId", required = false) UUID userId,
