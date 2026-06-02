@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,10 @@ import java.util.UUID;
 
 @Service
 public class AuthServiceImpl implements AuthService {
+
+    private static final String FAILURE_METRIC_VALUE = "failure";
+    private static final String SUCCESS_METRIC_VALUE = "success";
+    private static final String RESULT_METRIC_TAG = "result";
 
     private static final int EMAIL_MFA_CODE_LENGTH = 6;
     private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
@@ -55,6 +60,10 @@ public class AuthServiceImpl implements AuthService {
     private final String verificationUrlTemplate;
     private final long emailMfaCodeTtlSeconds;
     private final int maxConcurrentSessions;
+
+    @Autowired
+    @Lazy
+    private AuthService authServiceRef;
 
     @Autowired
     public AuthServiceImpl(UserRepository userRepository,
@@ -114,7 +123,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        String result = "failure";
+        String result = FAILURE_METRIC_VALUE;
         try {
             validateNewUser(request.getUsername(), request.getEmail());
 
@@ -143,10 +152,10 @@ public class AuthServiceImpl implements AuthService {
             sendVerificationEmail(savedUser, verificationToken);
 
             AuthResponse response = mapToAuthResponse(savedUser, null, null);
-            result = "success";
+            result = SUCCESS_METRIC_VALUE;
             return response;
         } finally {
-            meterRegistry.counter("bidmart.auth.register", "result", result).increment();
+            meterRegistry.counter("bidmart.auth.register", RESULT_METRIC_TAG, result).increment();
         }
     }
 
@@ -154,7 +163,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, String deviceInfo) {
         Timer.Sample sample = Timer.start(meterRegistry);
-        String result = "failure";
+        String result = FAILURE_METRIC_VALUE;
         try {
             User user = findUserByIdentifier(request.getIdentifier());
 
@@ -179,18 +188,18 @@ public class AuthServiceImpl implements AuthService {
             String resolvedDeviceInfo = (deviceInfo == null || deviceInfo.isBlank())
                     ? "Unknown-Device"
                     : deviceInfo;
-            AuthResponse response = finalizeLogin(user, resolvedDeviceInfo);
-            result = "success";
+            AuthResponse response = authServiceRef.finalizeLogin(user, resolvedDeviceInfo);
+            result = SUCCESS_METRIC_VALUE;
             return response;
         } finally {
-            meterRegistry.counter("bidmart.auth.login", "result", result).increment();
-            sample.stop(meterRegistry.timer("bidmart.auth.login.duration", "result", result));
+            meterRegistry.counter("bidmart.auth.login", RESULT_METRIC_TAG, result).increment();
+            sample.stop(meterRegistry.timer("bidmart.auth.login.duration", RESULT_METRIC_TAG, result));
         }
     }
     @Override
     @Transactional
     public AuthResponse verifyMfaLogin(MfaVerificationRequest request){
-        String result = "failure";
+        String result = FAILURE_METRIC_VALUE;
         String methodTag = "totp";
         try {
             String username = jwtService.extractUsername(request.getTempToken());
@@ -208,11 +217,11 @@ public class AuthServiceImpl implements AuthService {
                 throw new IllegalArgumentException("Invalid 2FA Code.");
             }
 
-            AuthResponse response = finalizeLogin(user, "Default Device");
-            result = "success";
+            AuthResponse response = authServiceRef.finalizeLogin(user, "Default Device");
+            result = SUCCESS_METRIC_VALUE;
             return response;
         } finally {
-            meterRegistry.counter("bidmart.auth.mfa.verify", "result", result, "method", methodTag).increment();
+            meterRegistry.counter("bidmart.auth.mfa.verify", RESULT_METRIC_TAG, result, "method", methodTag).increment();
         }
     }
 

@@ -41,9 +41,6 @@ public class RoleSeeder implements CommandLineRunner {
         Permission walletCreate = findOrCreatePermission("wallet:create");
         Permission walletList = findOrCreatePermission("wallet:list");
 
-        List<Permission> walletSelfService = List.of(
-                walletRead, walletTopUp, walletWithdraw, walletTransactionsRead);
-
         assignPermissions(userRole, List.of(
                 notificationRead, notificationUpdate,
                 walletRead, walletTopUp, walletWithdraw, walletTransactionsRead));
