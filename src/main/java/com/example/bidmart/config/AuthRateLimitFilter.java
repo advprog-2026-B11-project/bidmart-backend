@@ -1,5 +1,6 @@
 package com.example.bidmart.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,14 +25,17 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final FixedWindowRateLimiter loginLimiter;
     private final FixedWindowRateLimiter registerLimiter;
     private final FixedWindowRateLimiter verifyMfaLimiter;
+    private final MeterRegistry meterRegistry;
 
     public AuthRateLimitFilter(
+            MeterRegistry meterRegistry,
             @Value("${app.rate-limit.login.max-requests:5}") int loginMaxRequests,
             @Value("${app.rate-limit.login.window-seconds:60}") long loginWindowSeconds,
             @Value("${app.rate-limit.register.max-requests:3}") int registerMaxRequests,
             @Value("${app.rate-limit.register.window-seconds:600}") long registerWindowSeconds,
             @Value("${app.rate-limit.verify-mfa.max-requests:5}") int verifyMfaMaxRequests,
             @Value("${app.rate-limit.verify-mfa.window-seconds:60}") long verifyMfaWindowSeconds) {
+        this.meterRegistry = meterRegistry;
         this.loginLimiter = new FixedWindowRateLimiter(loginMaxRequests, Duration.ofSeconds(loginWindowSeconds));
         this.registerLimiter = new FixedWindowRateLimiter(registerMaxRequests, Duration.ofSeconds(registerWindowSeconds));
         this.verifyMfaLimiter = new FixedWindowRateLimiter(verifyMfaMaxRequests, Duration.ofSeconds(verifyMfaWindowSeconds));
@@ -45,15 +49,15 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         if (HttpMethod.POST.matches(request.getMethod())) {
             String path = request.getRequestURI();
             if (LOGIN_PATH.equals(path)) {
-                handleRateLimit(request, response, filterChain, loginLimiter);
+                handleRateLimit(request, response, filterChain, loginLimiter, "login");
                 return;
             }
             if (REGISTER_PATH.equals(path)) {
-                handleRateLimit(request, response, filterChain, registerLimiter);
+                handleRateLimit(request, response, filterChain, registerLimiter, "register");
                 return;
             }
             if (VERIFY_MFA_PATH.equals(path)) {
-                handleRateLimit(request, response, filterChain, verifyMfaLimiter);
+                handleRateLimit(request, response, filterChain, verifyMfaLimiter, "verify-mfa");
                 return;
             }
         }
@@ -65,10 +69,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain,
-            FixedWindowRateLimiter limiter) throws IOException, ServletException {
+            FixedWindowRateLimiter limiter,
+            String endpoint) throws IOException, ServletException {
         String key = resolveClientKey(request);
         RateLimitDecision decision = limiter.tryConsume(key);
         if (!decision.allowed()) {
+            meterRegistry.counter("bidmart.auth.ratelimit.blocked", "endpoint", endpoint).increment();
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", String.valueOf(decision.retryAfterSeconds()));
             response.setContentType("application/json");

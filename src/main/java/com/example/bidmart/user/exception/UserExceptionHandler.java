@@ -2,6 +2,8 @@ package com.example.bidmart.user.exception;
 
 import com.example.bidmart.common.exception.ErrorResponse;
 import java.time.Instant;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -13,6 +15,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+// Consulted before the global handler for user-module controllers so that, e.g.,
+// IllegalArgumentException maps to 400 (Bad Request) here instead of being swallowed
+// by GlobalExceptionHandler's catch-all Exception handler (which returns 500).
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackages = "com.example.bidmart.user")
 public class UserExceptionHandler {
 
