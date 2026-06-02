@@ -147,9 +147,10 @@ class AuthServiceImplTest {
     void login_userNotFound_incrementsFailureCounter() {
         when(userRepository.findByEmail("ghost")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+        LoginRequest req = loginReq("ghost", "password1");
 
         assertThrows(IllegalArgumentException.class,
-                () -> authService.login(loginReq("ghost", "password1"), "device"));
+                () -> authService.login(req, "device"));
 
         assertEquals(1.0,
                 meterRegistry.get("bidmart.auth.login").tag("result", "failure").counter().count(),
