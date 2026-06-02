@@ -18,9 +18,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
-    private static final String LOGIN_PATH = "/api/auth/login";
-    private static final String REGISTER_PATH = "/api/auth/register";
-    private static final String VERIFY_MFA_PATH = "/api/auth/verify-mfa";
+    private final String loginPath;
+    private final String registerPath;
+    private final String verifyMfaPath;
 
     private final FixedWindowRateLimiter loginLimiter;
     private final FixedWindowRateLimiter registerLimiter;
@@ -29,34 +29,41 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     public AuthRateLimitFilter(
             MeterRegistry meterRegistry,
+            @Value("${app.rate-limit.login.path:/api/auth/login}") String loginPath,
+            @Value("${app.rate-limit.register.path:/api/auth/register}") String registerPath,
+            @Value("${app.rate-limit.verify-mfa.path:/api/auth/verify-mfa}") String verifyMfaPath,
             @Value("${app.rate-limit.login.max-requests:5}") int loginMaxRequests,
             @Value("${app.rate-limit.login.window-seconds:60}") long loginWindowSeconds,
             @Value("${app.rate-limit.register.max-requests:3}") int registerMaxRequests,
             @Value("${app.rate-limit.register.window-seconds:600}") long registerWindowSeconds,
             @Value("${app.rate-limit.verify-mfa.max-requests:5}") int verifyMfaMaxRequests,
             @Value("${app.rate-limit.verify-mfa.window-seconds:60}") long verifyMfaWindowSeconds) {
+        
         this.meterRegistry = meterRegistry;
+        this.loginPath = loginPath;
+        this.registerPath = registerPath;
+        this.verifyMfaPath = verifyMfaPath;
+        
         this.loginLimiter = new FixedWindowRateLimiter(loginMaxRequests, Duration.ofSeconds(loginWindowSeconds));
         this.registerLimiter = new FixedWindowRateLimiter(registerMaxRequests, Duration.ofSeconds(registerWindowSeconds));
         this.verifyMfaLimiter = new FixedWindowRateLimiter(verifyMfaMaxRequests, Duration.ofSeconds(verifyMfaWindowSeconds));
     }
 
-    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         if (HttpMethod.POST.matches(request.getMethod())) {
             String path = request.getRequestURI();
-            if (LOGIN_PATH.equals(path)) {
+            if (loginPath.equals(path)) {
                 handleRateLimit(request, response, filterChain, loginLimiter, "login");
                 return;
             }
-            if (REGISTER_PATH.equals(path)) {
+            if (registerPath.equals(path)) {
                 handleRateLimit(request, response, filterChain, registerLimiter, "register");
                 return;
             }
-            if (VERIFY_MFA_PATH.equals(path)) {
+            if (verifyMfaPath.equals(path)) {
                 handleRateLimit(request, response, filterChain, verifyMfaLimiter, "verify-mfa");
                 return;
             }

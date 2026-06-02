@@ -54,7 +54,8 @@ class AuthServiceImplTest {
         authService = new AuthServiceImpl(
             userRepository, sessionRepository, passwordEncoder, jwtService,
             sessionService, mfaService, roleRepository, emailService, eventPublisher,
-            meterRegistry, "http://example.com/verify/{token}", 300L, 3
+            meterRegistry, "http://example.com/verify/{token}", 300L, 3,
+            null
         );
         ReflectionTestUtils.setField(authService, "authServiceRef", authService);
     }
@@ -149,8 +150,8 @@ class AuthServiceImplTest {
     void login_userNotFound_incrementsFailureCounter() {
         when(userRepository.findByEmail("ghost")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+        
         LoginRequest req = loginReq("ghost", "password1");
-
         assertThrows(IllegalArgumentException.class,
                 () -> authService.login(req, "device"));
 
@@ -237,7 +238,8 @@ class AuthServiceImplTest {
         authService = new AuthServiceImpl(
             userRepository, sessionRepository, passwordEncoder, jwtService,
             sessionService, mfaService, roleRepository, emailService, eventPublisher,
-            meterRegistry, "http://example.com/verify?token=", 300L, 3
+            meterRegistry, "http://example.com/verify?token=", 300L, 3,
+            null
         );
 
         RegisterRequest req = new RegisterRequest();
@@ -272,7 +274,7 @@ class AuthServiceImplTest {
         when(passwordEncoder.matches("rawPw", "encoded")).thenReturn(true);
         when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
         when(sessionService.createSession(user, "refresh", "Chrome")).thenReturn(session);
-        when(jwtService.generateAccessToken(eq(user), eq(session.getId()))).thenReturn("access");
+        when(jwtService.generateAccessToken(user, session.getId())).thenReturn("access");
 
         AuthResponse resp = authService.login(loginReq("alice", "rawPw"), "Chrome");
 
@@ -287,8 +289,9 @@ class AuthServiceImplTest {
         when(userRepository.findByEmail("alice")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
 
+        LoginRequest req = loginReq("alice", "rawPw");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.login(loginReq("alice", "rawPw"), "device"));
+            () -> authService.login(req, "device"));
     }
 
     @Test
@@ -299,8 +302,9 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
 
+        LoginRequest req = loginReq("alice", "wrong");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.login(loginReq("alice", "wrong"), "device"));
+            () -> authService.login(req, "device"));
     }
 
     @Test
@@ -314,8 +318,9 @@ class AuthServiceImplTest {
         when(passwordEncoder.matches("rawPw", "encoded")).thenReturn(true);
         when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
 
+        LoginRequest req = loginReq("alice", "rawPw");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.login(loginReq("alice", "rawPw"), "device"));
+            () -> authService.login(req, "device"));
         verify(emailService).sendVerificationEmail(anyString(), anyString());
     }
 
@@ -361,7 +366,7 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("rawPw", "encoded")).thenReturn(true);
         when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
-        when(sessionService.createSession(eq(user), eq("refresh"), eq("Unknown-Device"))).thenReturn(session);
+        when(sessionService.createSession(user, "refresh", "Unknown-Device")).thenReturn(session);
         when(jwtService.generateAccessToken(eq(user), any())).thenReturn("access");
 
         authService.login(loginReq("alice", "rawPw"), null);
@@ -377,7 +382,7 @@ class AuthServiceImplTest {
         when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("rawPw", "encoded")).thenReturn(true);
         when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
-        when(sessionService.createSession(eq(user), eq("refresh"), eq("Unknown-Device"))).thenReturn(session);
+        when(sessionService.createSession(user, "refresh", "Unknown-Device")).thenReturn(session);
         when(jwtService.generateAccessToken(eq(user), any())).thenReturn("access");
 
         authService.login(loginReq("alice@example.com", "rawPw"), "   ");
@@ -390,8 +395,9 @@ class AuthServiceImplTest {
         when(userRepository.findByEmail("nobody")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("nobody")).thenReturn(Optional.empty());
 
+        LoginRequest req = loginReq("nobody", "pw");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.login(loginReq("nobody", "pw"), "device"));
+            () -> authService.login(req, "device"));
     }
 
     // ─── verifyMfaLogin ───
@@ -406,7 +412,7 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(mfaService.verifyCode("secret", "123456")).thenReturn(true);
         when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
-        when(sessionService.createSession(eq(user), eq("refresh"), eq("Default Device"))).thenReturn(session);
+        when(sessionService.createSession(user, "refresh", "Default Device")).thenReturn(session);
         when(jwtService.generateAccessToken(eq(user), any())).thenReturn("access");
 
         AuthResponse resp = authService.verifyMfaLogin(mfaReq("temp", "123456"));
@@ -424,8 +430,9 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(mfaService.verifyCode("secret", "wrong")).thenReturn(false);
 
+        MfaVerificationRequest req = mfaReq("temp", "wrong");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.verifyMfaLogin(mfaReq("temp", "wrong")));
+            () -> authService.verifyMfaLogin(req));
     }
 
     @Test
@@ -440,7 +447,7 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenReturn(user);
         when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
-        when(sessionService.createSession(eq(user), eq("refresh"), eq("Default Device"))).thenReturn(session);
+        when(sessionService.createSession(user, "refresh", "Default Device")).thenReturn(session);
         when(jwtService.generateAccessToken(eq(user), any())).thenReturn("access");
 
         AuthResponse resp = authService.verifyMfaLogin(mfaReq("temp", "654321"));
@@ -460,8 +467,9 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenReturn(user);
 
+        MfaVerificationRequest req = mfaReq("temp", "654321");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.verifyMfaLogin(mfaReq("temp", "654321")));
+            () -> authService.verifyMfaLogin(req));
     }
 
     @Test
@@ -473,8 +481,9 @@ class AuthServiceImplTest {
         when(jwtService.extractUsername("temp")).thenReturn("alice");
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
 
+        MfaVerificationRequest req = mfaReq("temp", "654321");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.verifyMfaLogin(mfaReq("temp", "654321")));
+            () -> authService.verifyMfaLogin(req));
     }
 
     @Test
@@ -487,8 +496,9 @@ class AuthServiceImplTest {
         when(jwtService.extractUsername("temp")).thenReturn("alice");
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
 
+        MfaVerificationRequest req = mfaReq("temp", "000000");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.verifyMfaLogin(mfaReq("temp", "000000")));
+            () -> authService.verifyMfaLogin(req));
     }
 
     @Test
@@ -498,8 +508,9 @@ class AuthServiceImplTest {
         when(jwtService.extractUsername("temp")).thenReturn("alice");
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
 
+        MfaVerificationRequest req = mfaReq("temp", "123456");
         assertThrows(IllegalArgumentException.class,
-            () -> authService.verifyMfaLogin(mfaReq("temp", "123456")));
+            () -> authService.verifyMfaLogin(req));
     }
 
     @Test
@@ -512,7 +523,7 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(mfaService.verifyCode("secret", "123456")).thenReturn(true);
         when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
-        when(sessionService.createSession(eq(user), eq("refresh"), eq("Default Device"))).thenReturn(session);
+        when(sessionService.createSession(user, "refresh", "Default Device")).thenReturn(session);
         when(jwtService.generateAccessToken(eq(user), any())).thenReturn("access");
 
         assertFalse(authService.verifyMfaLogin(mfaReq("temp", "123456")).isMfaRequired());
@@ -526,8 +537,8 @@ class AuthServiceImplTest {
         SessionResponse session = buildSession();
 
         when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
-        when(sessionService.createSession(eq(user), eq("refresh"), eq("myDevice"))).thenReturn(session);
-        when(jwtService.generateAccessToken(eq(user), eq(session.getId()))).thenReturn("access");
+        when(sessionService.createSession(user, "refresh", "myDevice")).thenReturn(session);
+        when(jwtService.generateAccessToken(user, session.getId())).thenReturn("access");
 
         AuthResponse resp = authService.finalizeLogin(user, "myDevice");
 
@@ -629,7 +640,7 @@ class AuthServiceImplTest {
         when(sessionRepository.save(any(Session.class))).thenReturn(session);
         when(jwtService.generateRefreshToken(user)).thenReturn("new-refresh");
         when(sessionService.createSession(user, "new-refresh", "device")).thenReturn(newSession);
-        when(jwtService.generateAccessToken(eq(user), eq(newSession.getId()))).thenReturn("new-access");
+        when(jwtService.generateAccessToken(user, newSession.getId())).thenReturn("new-access");
 
         AuthResponse resp = authService.refreshToken("old-refresh");
 

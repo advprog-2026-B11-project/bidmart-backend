@@ -37,7 +37,7 @@ public class RoleController {
     public ResponseEntity<List<AdminRoleResponse>> listRoles() {
         List<AdminRoleResponse> roles = roleRepository.findAll().stream()
                 .map(AdminRoleResponse::from)
-                .collect(Collectors.toList());
+                .toList();
         return ResponseEntity.ok(roles);
     }
 

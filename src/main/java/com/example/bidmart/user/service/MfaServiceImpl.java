@@ -40,7 +40,7 @@ public class MfaServiceImpl implements MfaService {
             byte[] imageData = generator.generate(data);
             return Utils.getDataUriForImage(imageData, generator.getImageMimeType());
         } catch (QrGenerationException e) {
-            throw new RuntimeException("Error generating QR code", e);
+            throw new IllegalStateException("Error generating QR code", e);
         }
     }
 

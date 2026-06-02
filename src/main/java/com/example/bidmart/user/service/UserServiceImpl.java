@@ -34,6 +34,7 @@ public class UserServiceImpl implements UserService {
     private static final int EMAIL_MFA_CODE_LENGTH = 6;
     private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
     private static final long DEFAULT_EMAIL_MFA_TTL_SECONDS = 300L;
+    private static final String USER_NOT_FOUND_MSG = "User not found.";
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -62,7 +63,7 @@ public class UserServiceImpl implements UserService {
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
     }
 
-    @Deprecated
+    @Deprecated(since = "1.0", forRemoval = true)
     public UserServiceImpl(UserRepository userRepository,
                            SessionRepository sessionRepository,
                            ApplicationEventPublisher eventPublisher,
@@ -202,7 +203,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void reactivateUser(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND_MSG));
         if (user.isActive()) return;
         user.setActive(true);
         userRepository.save(user);
@@ -212,7 +213,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void deactivateUser(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND_MSG));
 
         if (!user.isActive()) {
             return;
