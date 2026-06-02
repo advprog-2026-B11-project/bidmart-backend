@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -55,6 +56,7 @@ class AuthServiceImplTest {
             sessionService, mfaService, roleRepository, emailService, eventPublisher,
             meterRegistry, "http://example.com/verify/{token}", 300L, 3
         );
+        ReflectionTestUtils.setField(authService, "authServiceRef", authService);
     }
 
     private User buildUser() {
@@ -147,9 +149,10 @@ class AuthServiceImplTest {
     void login_userNotFound_incrementsFailureCounter() {
         when(userRepository.findByEmail("ghost")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+        LoginRequest req = loginReq("ghost", "password1");
 
         assertThrows(IllegalArgumentException.class,
-                () -> authService.login(loginReq("ghost", "password1"), "device"));
+                () -> authService.login(req, "device"));
 
         assertEquals(1.0,
                 meterRegistry.get("bidmart.auth.login").tag("result", "failure").counter().count(),
