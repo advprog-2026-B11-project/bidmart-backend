@@ -13,6 +13,9 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -48,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final EmailService emailService;
     private final ApplicationEventPublisher eventPublisher;
+    private final MeterRegistry meterRegistry;
     private final String verificationUrlTemplate;
     private final long emailMfaCodeTtlSeconds;
     private final int maxConcurrentSessions;
@@ -62,6 +66,7 @@ public class AuthServiceImpl implements AuthService {
                             RoleRepository roleRepository,
                             EmailService emailService,
                             ApplicationEventPublisher eventPublisher,
+                            MeterRegistry meterRegistry,
                             @Value("${app.email.verification-url-template}") String verificationUrlTemplate,
                             @Value("${app.mfa.email-code-ttl-seconds:300}") long emailMfaCodeTtlSeconds,
                             @Value("${app.session.max-concurrent:3}") int maxConcurrentSessions) {
@@ -74,6 +79,7 @@ public class AuthServiceImpl implements AuthService {
         this.roleRepository = roleRepository;
         this.emailService = emailService;
         this.eventPublisher = eventPublisher;
+        this.meterRegistry = meterRegistry;
         this.verificationUrlTemplate = verificationUrlTemplate;
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
         this.maxConcurrentSessions = maxConcurrentSessions;
@@ -99,6 +105,7 @@ public class AuthServiceImpl implements AuthService {
                 roleRepository,
                 emailService,
                 eventPublisher,
+                new SimpleMeterRegistry(),
                 verificationUrlTemplate,
                 DEFAULT_EMAIL_MFA_TTL_SECONDS,
                 DEFAULT_MAX_CONCURRENT_SESSIONS);
@@ -107,80 +114,106 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        validateNewUser(request.getUsername(), request.getEmail());
+        String result = "failure";
+        try {
+            validateNewUser(request.getUsername(), request.getEmail());
 
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setDisplayName(request.getDisplayName());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        String roleName = resolveRoleName(request.getRole());
-        Role selectedRole = roleRepository.findByName(roleName)
-            .orElseThrow(() -> new IllegalStateException("Role '" + roleName + "' tidak ditemukan di database."));
-        user.setRole(selectedRole);
-        user.setEmailVerified(false);
+            User user = new User();
+            user.setUsername(request.getUsername());
+            user.setEmail(request.getEmail());
+            user.setDisplayName(request.getDisplayName());
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            String roleName = resolveRoleName(request.getRole());
+            Role selectedRole = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new IllegalStateException("Role '" + roleName + "' tidak ditemukan di database."));
+            user.setRole(selectedRole);
+            user.setEmailVerified(false);
 
-        String verificationToken = UUID.randomUUID().toString();
-        user.setVerificationToken(verificationToken);
+            String verificationToken = UUID.randomUUID().toString();
+            user.setVerificationToken(verificationToken);
 
-        User savedUser = userRepository.save(user);
+            User savedUser = userRepository.save(user);
 
-        // Auto-provision a wallet for every new user (buyer & seller alike). The
-        // WalletEventListener handles UserRegisteredEvent AFTER_COMMIT, so the wallet
-        // is created once registration successfully commits.
-        eventPublisher.publishEvent(new UserRegisteredEvent(
-                savedUser.getId(), savedUser.getUsername(), Instant.now()));
+            // Auto-provision a wallet for every new user (buyer & seller alike). The
+            // WalletEventListener handles UserRegisteredEvent AFTER_COMMIT, so the wallet
+            // is created once registration successfully commits.
+            eventPublisher.publishEvent(new UserRegisteredEvent(
+                    savedUser.getId(), savedUser.getUsername(), Instant.now()));
 
-        sendVerificationEmail(savedUser, verificationToken);
+            sendVerificationEmail(savedUser, verificationToken);
 
-        return mapToAuthResponse(savedUser, null, null);
+            AuthResponse response = mapToAuthResponse(savedUser, null, null);
+            result = "success";
+            return response;
+        } finally {
+            meterRegistry.counter("bidmart.auth.register", "result", result).increment();
+        }
     }
 
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request, String deviceInfo) {
-        User user = findUserByIdentifier(request.getIdentifier());
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String result = "failure";
+        try {
+            User user = findUserByIdentifier(request.getIdentifier());
 
-        if (!user.isActive()) {
-            throw new IllegalArgumentException("Account is deactivated.");
+            if (!user.isActive()) {
+                throw new IllegalArgumentException("Account is deactivated.");
+            }
+
+            if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+                throw new IllegalArgumentException("Invalid password.");
+            }
+
+            if (!user.isEmailVerified()) {
+                resendVerification(user.getEmail());
+                throw new IllegalArgumentException("Your email has not been verified yet. A new verification link has been sent to your email address.");
+            }
+
+            if (user.isMfaEnabled()){
+                result = "mfa_required";
+                return startMfaChallenge(user);
+            }
+
+            String resolvedDeviceInfo = (deviceInfo == null || deviceInfo.isBlank())
+                    ? "Unknown-Device"
+                    : deviceInfo;
+            AuthResponse response = finalizeLogin(user, resolvedDeviceInfo);
+            result = "success";
+            return response;
+        } finally {
+            meterRegistry.counter("bidmart.auth.login", "result", result).increment();
+            sample.stop(meterRegistry.timer("bidmart.auth.login.duration", "result", result));
         }
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("Invalid password.");
-        }
-
-        if (!user.isEmailVerified()) {
-            resendVerification(user.getEmail()); 
-            throw new IllegalArgumentException("Your email has not been verified yet. A new verification link has been sent to your email address.");
-        }
-
-        if (user.isMfaEnabled()){
-            return startMfaChallenge(user);
-        }
-
-        String resolvedDeviceInfo = (deviceInfo == null || deviceInfo.isBlank())
-                ? "Unknown-Device"
-                : deviceInfo;
-        return finalizeLogin(user, resolvedDeviceInfo);
     }
     @Override
     @Transactional
     public AuthResponse verifyMfaLogin(MfaVerificationRequest request){
-        String username = jwtService.extractUsername(request.getTempToken());
-        User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found."));
+        String result = "failure";
+        String methodTag = "totp";
+        try {
+            String username = jwtService.extractUsername(request.getTempToken());
+            User user = userRepository.findByUsername(username).orElseThrow(() -> new IllegalArgumentException("User not found."));
 
-        if (!user.isActive()) {
-            throw new IllegalArgumentException("Account is deactivated.");
+            if (!user.isActive()) {
+                throw new IllegalArgumentException("Account is deactivated.");
+            }
+
+            MfaMethod method = resolveMfaMethod(user);
+            methodTag = (method == MfaMethod.EMAIL) ? "email" : "totp";
+            if (method == MfaMethod.EMAIL) {
+                verifyEmailMfa(user, request.getCode());
+            } else if (!mfaService.verifyCode(user.getMfaSecret(), request.getCode())){
+                throw new IllegalArgumentException("Invalid 2FA Code.");
+            }
+
+            AuthResponse response = finalizeLogin(user, "Default Device");
+            result = "success";
+            return response;
+        } finally {
+            meterRegistry.counter("bidmart.auth.mfa.verify", "result", result, "method", methodTag).increment();
         }
-
-        MfaMethod method = resolveMfaMethod(user);
-        if (method == MfaMethod.EMAIL) {
-            verifyEmailMfa(user, request.getCode());
-        } else if (!mfaService.verifyCode(user.getMfaSecret(), request.getCode())){
-            throw new IllegalArgumentException("Invalid 2FA Code.");
-        }
-
-        return finalizeLogin(user, "Default Device");
     }
 
     @Override
@@ -207,12 +240,14 @@ public class AuthServiceImpl implements AuthService {
     public boolean verifyEmail(String token) {
         Optional<User> userOptional = userRepository.findByVerificationToken(token);
         if (userOptional.isEmpty()) {
+            meterRegistry.counter("bidmart.auth.email.verify", "result", "failure").increment();
             return false;
         }
         User user = userOptional.get();
         user.setEmailVerified(true);
         user.setVerificationToken(null);
         userRepository.save(user);
+        meterRegistry.counter("bidmart.auth.email.verify", "result", "success").increment();
         return true;
     }
 
@@ -337,21 +372,28 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse refreshToken(String refreshTokenStr) {
-        Session session = sessionRepository.findByRefreshToken(refreshTokenStr).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token."));
-        if (session.isRevoked() || session.getExpiresAt().isBefore(Instant.now())){
-            throw new IllegalArgumentException("Refresh token expired or revoked. Please login again.");
-        }
-        User user = session.getUser();
-        if (!user.isActive()) {
-            throw new IllegalArgumentException("User account is deactivated.");
-        }
+        String result = "failure";
+        try {
+            Session session = sessionRepository.findByRefreshToken(refreshTokenStr).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token."));
+            if (session.isRevoked() || session.getExpiresAt().isBefore(Instant.now())){
+                throw new IllegalArgumentException("Refresh token expired or revoked. Please login again.");
+            }
+            User user = session.getUser();
+            if (!user.isActive()) {
+                throw new IllegalArgumentException("User account is deactivated.");
+            }
 
-        session.setRevoked(true);
-        sessionRepository.save(session);
-        String newRefreshToken = jwtService.generateRefreshToken(user);
-        SessionResponse newSession = sessionService.createSession(user, newRefreshToken, session.getDeviceInfo());
-        String newAccessToken = jwtService.generateAccessToken(user, newSession.getId());
+            session.setRevoked(true);
+            sessionRepository.save(session);
+            String newRefreshToken = jwtService.generateRefreshToken(user);
+            SessionResponse newSession = sessionService.createSession(user, newRefreshToken, session.getDeviceInfo());
+            String newAccessToken = jwtService.generateAccessToken(user, newSession.getId());
 
-        return mapToAuthResponse(user, newAccessToken, newRefreshToken);
+            AuthResponse response = mapToAuthResponse(user, newAccessToken, newRefreshToken);
+            result = "success";
+            return response;
+        } finally {
+            meterRegistry.counter("bidmart.auth.token.refresh", "result", result).increment();
+        }
     }
 }
