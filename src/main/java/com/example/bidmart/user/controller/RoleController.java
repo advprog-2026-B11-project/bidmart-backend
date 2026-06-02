@@ -21,7 +21,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @PreAuthorize("hasRole('ADMIN') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ROLE_MANAGE)")
-@CrossOrigin(origins = "*")
 public class RoleController {
 
     private final RoleRepository roleRepository;
