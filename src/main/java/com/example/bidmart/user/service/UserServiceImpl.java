@@ -22,7 +22,6 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +32,6 @@ public class UserServiceImpl implements UserService {
     private static final String MFA_METHOD_NONE = "NONE";
     private static final int EMAIL_MFA_CODE_LENGTH = 6;
     private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
-    private static final long DEFAULT_EMAIL_MFA_TTL_SECONDS = 300L;
     private static final String USER_NOT_FOUND_MSG = "User not found.";
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -61,21 +59,6 @@ public class UserServiceImpl implements UserService {
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
-    }
-
-    @Deprecated(since = "1.0", forRemoval = true)
-    public UserServiceImpl(UserRepository userRepository,
-                           SessionRepository sessionRepository,
-                           ApplicationEventPublisher eventPublisher,
-                           MfaService mfaService,
-                           EmailService emailService) {
-        this(userRepository,
-                sessionRepository,
-                eventPublisher,
-                mfaService,
-                new BCryptPasswordEncoder(),
-                emailService,
-                DEFAULT_EMAIL_MFA_TTL_SECONDS);
     }
 
     @Override
@@ -238,7 +221,7 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND_MSG));
 
         Role oldRole = user.getRole();
         if (oldRole == newRole) {
@@ -345,14 +328,14 @@ public class UserServiceImpl implements UserService {
 
     private User findByUsername(String username) {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND_MSG));
     }
 
     @Override
     @Transactional
     public void deleteProfile(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND_MSG));
 
         sessionRepository.deleteAllByUserId(user.getId());
         userRepository.delete(user);

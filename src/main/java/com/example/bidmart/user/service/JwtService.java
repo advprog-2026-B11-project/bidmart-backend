@@ -4,10 +4,6 @@ import com.example.bidmart.user.model.User;
 import java.util.UUID;
 
 public interface JwtService {
-    @Deprecated(since = "1.0", forRemoval = true)
-    default String generateAccessToken(User user) {
-        throw new UnsupportedOperationException("Use generateAccessToken(user, sessionId)");
-    }
 
     String generateAccessToken(User user, UUID sessionId);
     String generateRefreshToken(User user);
