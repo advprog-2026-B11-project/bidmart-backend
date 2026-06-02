@@ -94,11 +94,8 @@ public class BidService {
                 .map(Bid::getReservedAmount)
                 .orElse(BigDecimal.ZERO);
 
-        BigDecimal additionalReserve = reserveTarget.max(previousReservedAmount)
-                .subtract(previousReservedAmount);
-
-        if (strategy.requiresFundHolding() && additionalReserve.compareTo(BigDecimal.ZERO) > 0) {
-            walletService.reserveBidFunds(buyerId, request.listingId(), additionalReserve);
+        if (strategy.requiresFundHolding() && reserveTarget.compareTo(previousReservedAmount) > 0) {
+            walletService.reserveBidFunds(buyerId, request.listingId(), reserveTarget);
         }
 
         Bid bid = new Bid();
