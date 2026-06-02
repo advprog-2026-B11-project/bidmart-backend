@@ -30,9 +30,30 @@ public class RoleSeeder implements CommandLineRunner {
         Permission notificationUpdate = findOrCreatePermission("notification:update");
         Permission notificationDelete = findOrCreatePermission("notification:delete");
 
-        assignPermissions(userRole, List.of(notificationRead, notificationUpdate));
-        assignPermissions(sellerRole, List.of(notificationRead, notificationUpdate));
-        assignPermissions(adminRole, List.of(notificationRead, notificationUpdate, notificationDelete));
+        // Wallet self-service permissions for end users (buyers & sellers).
+        // NOTE: wallet:hold / wallet:release / wallet:settle / wallet:confirm-delivery
+        // are intentionally NOT granted here — those endpoints require ROLE_INTERNAL_SERVICE
+        // (server-to-server). wallet:create / wallet:list are admin-only.
+        Permission walletRead = findOrCreatePermission("wallet:read");
+        Permission walletTopUp = findOrCreatePermission("wallet:top-up");
+        Permission walletWithdraw = findOrCreatePermission("wallet:withdraw");
+        Permission walletTransactionsRead = findOrCreatePermission("wallet:transactions:read");
+        Permission walletCreate = findOrCreatePermission("wallet:create");
+        Permission walletList = findOrCreatePermission("wallet:list");
+
+        List<Permission> walletSelfService = List.of(
+                walletRead, walletTopUp, walletWithdraw, walletTransactionsRead);
+
+        assignPermissions(userRole, List.of(
+                notificationRead, notificationUpdate,
+                walletRead, walletTopUp, walletWithdraw, walletTransactionsRead));
+        assignPermissions(sellerRole, List.of(
+                notificationRead, notificationUpdate,
+                walletRead, walletTopUp, walletWithdraw, walletTransactionsRead));
+        assignPermissions(adminRole, List.of(
+                notificationRead, notificationUpdate, notificationDelete,
+                walletRead, walletTopUp, walletWithdraw, walletTransactionsRead,
+                walletCreate, walletList));
     }
 
     private Role findOrCreateRole(String name) {

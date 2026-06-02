@@ -12,12 +12,15 @@ import com.example.bidmart.user.model.User;
 import com.example.bidmart.user.repository.RoleRepository;
 import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
+import com.example.bidmart.common.event.UserRegisteredEvent;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
@@ -39,15 +42,18 @@ class AuthServiceImplTest {
     @Mock private MfaService mfaService;
     @Mock private RoleRepository roleRepository;
     @Mock private EmailService emailService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
+    private SimpleMeterRegistry meterRegistry;
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
         authService = new AuthServiceImpl(
             userRepository, sessionRepository, passwordEncoder, jwtService,
-            sessionService, mfaService, roleRepository, emailService,
-            "http://example.com/verify/{token}", 300L, 3
+            sessionService, mfaService, roleRepository, emailService, eventPublisher,
+            meterRegistry, "http://example.com/verify/{token}", 300L, 3
         );
     }
 
@@ -106,6 +112,48 @@ class AuthServiceImplTest {
         assertEquals("alice", resp.getUsername());
         assertNull(resp.getAccessToken());
         verify(emailService).sendVerificationEmail(eq("alice@example.com"), anyString());
+
+        // Registration must publish UserRegisteredEvent so the wallet module
+        // auto-provisions a wallet for the new user (buyer & seller alike).
+        ArgumentCaptor<UserRegisteredEvent> eventCaptor = ArgumentCaptor.forClass(UserRegisteredEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(saved.getId(), eventCaptor.getValue().userId());
+        assertEquals("alice", eventCaptor.getValue().username());
+    }
+
+    @Test
+    void register_success_incrementsSuccessCounter() {
+        RegisterRequest req = new RegisterRequest();
+        req.setUsername("alice"); req.setEmail("alice@example.com");
+        req.setDisplayName("Alice"); req.setPassword("password1"); req.setRole("USER");
+
+        Role role = new Role(); role.setName("USER");
+        User saved = buildUser();
+
+        when(userRepository.existsByUsername("alice")).thenReturn(false);
+        when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password1")).thenReturn("encoded");
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(role));
+        when(userRepository.save(any(User.class))).thenReturn(saved);
+
+        authService.register(req);
+
+        assertEquals(1.0,
+                meterRegistry.get("bidmart.auth.register").tag("result", "success").counter().count(),
+                0.0001);
+    }
+
+    @Test
+    void login_userNotFound_incrementsFailureCounter() {
+        when(userRepository.findByEmail("ghost")).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> authService.login(loginReq("ghost", "password1"), "device"));
+
+        assertEquals(1.0,
+                meterRegistry.get("bidmart.auth.login").tag("result", "failure").counter().count(),
+                0.0001);
     }
 
     @Test
@@ -185,8 +233,8 @@ class AuthServiceImplTest {
     void register_urlWithoutPlaceholder_appendsToken() {
         authService = new AuthServiceImpl(
             userRepository, sessionRepository, passwordEncoder, jwtService,
-            sessionService, mfaService, roleRepository, emailService,
-            "http://example.com/verify?token=", 300L, 3
+            sessionService, mfaService, roleRepository, emailService, eventPublisher,
+            meterRegistry, "http://example.com/verify?token=", 300L, 3
         );
 
         RegisterRequest req = new RegisterRequest();
