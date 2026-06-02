@@ -15,7 +15,6 @@ import com.example.bidmart.user.repository.SessionRepository;
 import com.example.bidmart.user.repository.UserRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,8 +39,6 @@ public class AuthServiceImpl implements AuthService {
 
     private static final int EMAIL_MFA_CODE_LENGTH = 6;
     private static final int EMAIL_MFA_CODE_MAX = 1_000_000;
-    private static final long DEFAULT_EMAIL_MFA_TTL_SECONDS = 300L;
-    private static final int DEFAULT_MAX_CONCURRENT_SESSIONS = 3;
     private static final String DEFAULT_ROLE_NAME = "USER";
     private static final Set<String> REGISTRABLE_ROLE_NAMES = Set.of("USER", "SELLER");
 
@@ -92,33 +89,6 @@ public class AuthServiceImpl implements AuthService {
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
         this.maxConcurrentSessions = maxConcurrentSessions;
         this.authServiceRef = authServiceRef;
-    }
-
-    @Deprecated(since = "1.0", forRemoval = true)
-    public AuthServiceImpl(UserRepository userRepository,
-                           SessionRepository sessionRepository,
-                           PasswordEncoder passwordEncoder,
-                           JwtService jwtService,
-                           SessionService sessionService,
-                           MfaService mfaService,
-                           RoleRepository roleRepository,
-                           EmailService emailService,
-                           ApplicationEventPublisher eventPublisher,
-                           String verificationUrlTemplate) {
-        this(userRepository,
-                sessionRepository,
-                passwordEncoder,
-                jwtService,
-                sessionService,
-                mfaService,
-                roleRepository,
-                emailService,
-                eventPublisher,
-                new SimpleMeterRegistry(),
-                verificationUrlTemplate,
-                DEFAULT_EMAIL_MFA_TTL_SECONDS,
-                DEFAULT_MAX_CONCURRENT_SESSIONS,
-                null);
     }
 
     @Override
@@ -250,14 +220,14 @@ public class AuthServiceImpl implements AuthService {
     public boolean verifyEmail(String token) {
         Optional<User> userOptional = userRepository.findByVerificationToken(token);
         if (userOptional.isEmpty()) {
-            meterRegistry.counter("bidmart.auth.email.verify", "result", "failure").increment();
+            meterRegistry.counter("bidmart.auth.email.verify", RESULT_METRIC_TAG, FAILURE_METRIC_VALUE).increment();
             return false;
         }
         User user = userOptional.get();
         user.setEmailVerified(true);
         user.setVerificationToken(null);
         userRepository.save(user);
-        meterRegistry.counter("bidmart.auth.email.verify", "result", "success").increment();
+        meterRegistry.counter("bidmart.auth.email.verify", RESULT_METRIC_TAG, SUCCESS_METRIC_VALUE).increment();
         return true;
     }
 
