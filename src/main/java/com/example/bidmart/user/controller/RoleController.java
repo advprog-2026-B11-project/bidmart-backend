@@ -17,7 +17,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @PreAuthorize("hasRole('ADMIN') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ROLE_MANAGE)")
@@ -37,7 +36,7 @@ public class RoleController {
     public ResponseEntity<List<AdminRoleResponse>> listRoles() {
         List<AdminRoleResponse> roles = roleRepository.findAll().stream()
                 .map(AdminRoleResponse::from)
-                .collect(Collectors.toList());
+                .toList();
         return ResponseEntity.ok(roles);
     }
 

@@ -40,41 +40,45 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .cors(Customizer.withDefaults())
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/verify-mfa", "/api/auth/refresh", "/api/auth/resend-verification").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
-                .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
-                .requestMatchers("/error").permitAll()
-
-                .requestMatchers(
-                    "/api/wallet/hold",
-                    "/api/wallet/release",
-                    "/api/wallet/settle",
-                    "/api/wallet/confirm-delivery"
-                ).hasRole("INTERNAL_SERVICE")
-
-                .requestMatchers("/api/wallet/**").authenticated()
-                
-                .requestMatchers("/api/listings/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
-                .requestMatchers("/api/bids/mocks/**").permitAll()
-                .requestMatchers("/api/bids/**").permitAll()
-                .requestMatchers("/api/orders/**").authenticated()
-                .requestMatchers("/api/notifications/**").permitAll()
-
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
+        try {
+            http
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/verify-mfa", "/api/auth/refresh", "/api/auth/resend-verification").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
+                    .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
+                    .requestMatchers("/error").permitAll()
+    
+                    .requestMatchers(
+                        "/api/wallet/hold",
+                        "/api/wallet/release",
+                        "/api/wallet/settle",
+                        "/api/wallet/confirm-delivery"
+                    ).hasRole("INTERNAL_SERVICE")
+    
+                    .requestMatchers("/api/wallet/**").authenticated()
+                    
+                    .requestMatchers("/api/listings/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                    .requestMatchers("/api/bids/mocks/**").permitAll()
+                    .requestMatchers("/api/bids/**").permitAll()
+                    .requestMatchers("/api/orders/**").authenticated()
+                    .requestMatchers("/api/notifications/**").permitAll()
+    
+                    .anyRequest().authenticated()
+                )
+                .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+    
+            return http.build();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to configure security filter chain", e);
+        }
     }
 
     @Bean
@@ -96,8 +100,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) {
+        try {
+            return config.getAuthenticationManager();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to get authentication manager", e);
+        }
     }
 }

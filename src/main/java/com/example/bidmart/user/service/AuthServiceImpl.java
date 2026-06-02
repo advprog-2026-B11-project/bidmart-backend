@@ -61,9 +61,7 @@ public class AuthServiceImpl implements AuthService {
     private final long emailMfaCodeTtlSeconds;
     private final int maxConcurrentSessions;
 
-    @Autowired
-    @Lazy
-    private AuthService authServiceRef;
+    private final AuthService authServiceRef;
 
     @Autowired
     public AuthServiceImpl(UserRepository userRepository,
@@ -78,7 +76,8 @@ public class AuthServiceImpl implements AuthService {
                             MeterRegistry meterRegistry,
                             @Value("${app.email.verification-url-template}") String verificationUrlTemplate,
                             @Value("${app.mfa.email-code-ttl-seconds:300}") long emailMfaCodeTtlSeconds,
-                            @Value("${app.session.max-concurrent:3}") int maxConcurrentSessions) {
+                            @Value("${app.session.max-concurrent:3}") int maxConcurrentSessions,
+                            @Lazy AuthService authServiceRef) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
@@ -92,9 +91,10 @@ public class AuthServiceImpl implements AuthService {
         this.verificationUrlTemplate = verificationUrlTemplate;
         this.emailMfaCodeTtlSeconds = emailMfaCodeTtlSeconds;
         this.maxConcurrentSessions = maxConcurrentSessions;
+        this.authServiceRef = authServiceRef;
     }
 
-    @Deprecated
+    @Deprecated(since = "1.0", forRemoval = true)
     public AuthServiceImpl(UserRepository userRepository,
                            SessionRepository sessionRepository,
                            PasswordEncoder passwordEncoder,
@@ -117,7 +117,8 @@ public class AuthServiceImpl implements AuthService {
                 new SimpleMeterRegistry(),
                 verificationUrlTemplate,
                 DEFAULT_EMAIL_MFA_TTL_SECONDS,
-                DEFAULT_MAX_CONCURRENT_SESSIONS);
+                DEFAULT_MAX_CONCURRENT_SESSIONS,
+                null);
     }
 
     @Override
@@ -176,7 +177,7 @@ public class AuthServiceImpl implements AuthService {
             }
 
             if (!user.isEmailVerified()) {
-                resendVerification(user.getEmail());
+                authServiceRef.resendVerification(user.getEmail());
                 throw new IllegalArgumentException("Your email has not been verified yet. A new verification link has been sent to your email address.");
             }
 
@@ -381,7 +382,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse refreshToken(String refreshTokenStr) {
-        String result = "failure";
+        String result = FAILURE_METRIC_VALUE;
         try {
             Session session = sessionRepository.findByRefreshToken(refreshTokenStr).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token."));
             if (session.isRevoked() || session.getExpiresAt().isBefore(Instant.now())){
@@ -399,10 +400,10 @@ public class AuthServiceImpl implements AuthService {
             String newAccessToken = jwtService.generateAccessToken(user, newSession.getId());
 
             AuthResponse response = mapToAuthResponse(user, newAccessToken, newRefreshToken);
-            result = "success";
+            result = SUCCESS_METRIC_VALUE;
             return response;
         } finally {
-            meterRegistry.counter("bidmart.auth.token.refresh", "result", result).increment();
+            meterRegistry.counter("bidmart.auth.token.refresh", RESULT_METRIC_TAG, result).increment();
         }
     }
 }
