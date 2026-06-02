@@ -203,7 +203,7 @@ class BidServiceTest {
         }
 
         @Test
-        void sameBuyerRaisesBid_onlyDeltaReserved_noFundsReleased() {
+        void sameBuyerRaisesBid_fullNewTargetReserved_noFundsReleased() {
             UUID listingId = UUID.randomUUID();
             UUID buyerId   = UUID.randomUUID();
             BigDecimal previousAmount = new BigDecimal("200.00");
@@ -223,7 +223,7 @@ class BidServiceTest {
 
             bidService.placeBid(buyerId, request);
 
-            verify(walletService).reserveBidFunds(buyerId, listingId, new BigDecimal("100.00"));
+            verify(walletService).reserveBidFunds(buyerId, listingId, new BigDecimal("300.00"));
             verify(walletService, never()).releaseBidFunds(any(), any(), any());
             verify(eventPublisher, never()).publishEvent(any(OutbidEvent.class));
             verify(eventPublisher).publishEvent(any(BidPlacedEvent.class));
