@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -55,6 +56,7 @@ class AuthServiceImplTest {
             sessionService, mfaService, roleRepository, emailService, eventPublisher,
             meterRegistry, "http://example.com/verify/{token}", 300L, 3
         );
+        ReflectionTestUtils.setField(authService, "authServiceRef", authService);
     }
 
     private User buildUser() {
