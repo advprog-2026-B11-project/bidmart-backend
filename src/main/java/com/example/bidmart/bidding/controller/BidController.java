@@ -44,14 +44,22 @@ public class BidController {
 
     @GetMapping("/listing/{listingId}")
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_READ)")
-    public List<BidResponse> getBidsByListing(@PathVariable("listingId") UUID listingId) {
-        return bidService.getBidsByListing(listingId);
+    public List<BidResponse> getBidsByListing(
+            @PathVariable("listingId") UUID listingId,
+            Authentication authentication
+    ) {
+        UUID viewerId = resolveCurrentUserId(authentication);
+        return bidService.getBidsByListing(listingId, viewerId);
     }
 
     @GetMapping("/listing/{listingId}/highest")
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).BID_READ)")
-    public BidResponse getHighestBid(@PathVariable("listingId") UUID listingId) {
-        return bidService.getHighestBid(listingId);
+    public BidResponse getHighestBid(
+            @PathVariable("listingId") UUID listingId,
+            Authentication authentication
+    ) {
+        UUID viewerId = authentication != null ? resolveCurrentUserId(authentication) : null;
+        return bidService.getHighestBid(listingId, viewerId);
     }
 
     @GetMapping("/listing/{listingId}/minimum-bid")

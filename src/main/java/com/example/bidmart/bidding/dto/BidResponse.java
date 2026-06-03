@@ -26,4 +26,23 @@ public record BidResponse(
                 bid.getCreatedAt()
         );
     }
+
+    /**
+     * Privacy-aware factory: hides {@code proxyMaxLimit} for bids not owned by {@code viewerId}.
+     * Pass {@code null} as {@code viewerId} to mask all proxy limits (e.g., unauthenticated callers).
+     */
+    public static BidResponse from(Bid bid, UUID viewerId) {
+        BigDecimal visibleMaxLimit = (viewerId != null && bid.getBuyerId().equals(viewerId))
+                ? bid.getProxyMaxLimit()
+                : null;
+        return new BidResponse(
+                bid.getId(),
+                bid.getListingId(),
+                bid.getBuyerId(),
+                bid.getAmount(),
+                bid.getProxyBid(),
+                visibleMaxLimit,
+                bid.getCreatedAt()
+        );
+    }
 }

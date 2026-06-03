@@ -1,9 +1,11 @@
 package com.example.bidmart.bidding.controller;
 
 import com.example.bidmart.bidding.dto.BidTooLowResponse;
+import com.example.bidmart.bidding.dto.ProxyOutbidResponse;
 import com.example.bidmart.bidding.exception.BidConflictException;
 import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
+import com.example.bidmart.bidding.exception.ProxyChallengerOutbidException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.common.exception.ErrorResponse;
 import com.example.bidmart.wallet.exception.InsufficientBalanceException;
@@ -46,6 +48,18 @@ public class BidControllerAdvice {
     @ExceptionHandler(InsufficientBalanceException.class)
     public ResponseEntity<ErrorResponse> handleInsufficientBalance(InsufficientBalanceException ex) {
         return build(HttpStatus.UNPROCESSABLE_CONTENT, "INSUFFICIENT_BALANCE", ex.getMessage());
+    }
+
+    // Proxy auto-countered the challenger
+    @ExceptionHandler(ProxyChallengerOutbidException.class)
+    public ResponseEntity<ProxyOutbidResponse> handleProxyChallenger(ProxyChallengerOutbidException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(new ProxyOutbidResponse(
+                        -4,
+                        "PROXY_OUTBID",
+                        ex.getMessage(),
+                        Instant.now().toString(),
+                        ex.getCurrentHighestBid()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

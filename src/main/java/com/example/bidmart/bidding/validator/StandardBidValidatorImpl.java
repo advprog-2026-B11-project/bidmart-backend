@@ -55,10 +55,18 @@ public class StandardBidValidatorImpl implements BidRuleValidator {
     ) {
         validateBuyerIsNotSeller(listing, buyerId);
         validateAuctionIsOpen(listing);
-        validateBidAmount(bidAmount, listing, currentHighestBid);
+
+        // The current highest bidder may be updating their proxy — amount rules are
+        // enforced by ProxyBiddingEngine instead of here to avoid false rejections.
+        boolean isBuyerCurrentWinner = currentHighestBid
+                .map(b -> b.getBuyerId() != null && b.getBuyerId().equals(buyerId))
+                .orElse(false);
+        if (!isBuyerCurrentWinner) {
+            validateBidAmount(bidAmount, listing, currentHighestBid);
+        }
     }
 
-    // --- private helpers ---------------------------------------------------
+    // --- helper ---------------------------------------------------
 
     private void validateBuyerIsNotSeller(ListingSnapshot listing, UUID buyerId) {
         if (listing.sellerId() != null && listing.sellerId().equals(buyerId)) {

@@ -77,9 +77,9 @@ class BidControllerTest {
 
     @Test
     void getBidsByListing_shouldReturnList() {
-        when(bidService.getBidsByListing(listingId)).thenReturn(List.of(sampleResponse()));
+        when(bidService.getBidsByListing(listingId, buyerId)).thenReturn(List.of(sampleResponse()));
 
-        List<BidResponse> result = bidController.getBidsByListing(listingId);
+        List<BidResponse> result = bidController.getBidsByListing(listingId, authentication);
 
         assertEquals(1, result.size());
         assertEquals(new BigDecimal("250.00"), result.get(0).amount());
@@ -90,9 +90,9 @@ class BidControllerTest {
     @Test
     void getHighestBid_shouldReturnHighestBid() {
         BidResponse highest = sampleResponse();
-        when(bidService.getHighestBid(listingId)).thenReturn(highest);
+        when(bidService.getHighestBid(listingId, buyerId)).thenReturn(highest);
 
-        BidResponse result = bidController.getHighestBid(listingId);
+        BidResponse result = bidController.getHighestBid(listingId, authentication);
 
         assertNotNull(result);
         assertEquals(highest.id(), result.id());
