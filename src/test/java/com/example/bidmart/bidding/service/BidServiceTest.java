@@ -12,6 +12,7 @@ import com.example.bidmart.bidding.strategy.AuctionStrategy;
 import com.example.bidmart.bidding.strategy.AuctionStrategyRegistry;
 import com.example.bidmart.bidding.strategy.ValidationResult;
 import com.example.bidmart.bidding.validator.BidRuleValidator;
+import com.example.bidmart.bidding.service.ProxyBiddingEngine;
 import com.example.bidmart.common.event.AuctionExtendedEvent;
 import com.example.bidmart.common.event.BidPlacedEvent;
 import com.example.bidmart.common.event.OutbidEvent;
@@ -40,6 +41,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -58,6 +60,7 @@ class BidServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private AuctionStrategyRegistry   strategyRegistry;
     @Mock private AuctionStrategy           auctionStrategy;
+    @Mock private ProxyBiddingEngine        proxyEngine;
 
     @InjectMocks
     private BidService bidService;
@@ -67,6 +70,9 @@ class BidServiceTest {
         lenient().when(strategyRegistry.getStrategy(any(AuctionType.class))).thenReturn(auctionStrategy);
         lenient().when(auctionStrategy.validateBid(any(), any())).thenReturn(ValidationResult.ok());
         lenient().when(auctionStrategy.requiresFundHolding()).thenReturn(true);
+        // ProxyBiddingEngine default: no active proxy, so regular bid flow is exercised
+        lenient().when(proxyEngine.validateAndGetActiveProxy(any(), any(), anyBoolean(), any(), any()))
+                 .thenReturn(Optional.empty());
     }
 
     private Listing activeListing(UUID id, UUID sellerId, BigDecimal startingPrice) {
@@ -405,7 +411,7 @@ class BidServiceTest {
 
         @Test
         void nullListingId_throws() {
-            assertThatThrownBy(() -> bidService.getBidsByListing(null))
+            assertThatThrownBy(() -> bidService.getBidsByListing(null, null))
                     .isInstanceOf(BidValidationException.class)
                     .hasMessageContaining("listingId wajib diisi.");
         }
@@ -413,11 +419,12 @@ class BidServiceTest {
         @Test
         void validListingId_returnsAllBidsForListing() {
             UUID listingId = UUID.randomUUID();
+            UUID viewerId = UUID.randomUUID();
             Bid bid = regularBid(listingId, UUID.randomUUID(), new BigDecimal("100.00"));
             when(bidRepository.findByListingIdOrderByCreatedAtDesc(listingId))
                     .thenReturn(List.of(bid));
 
-            List<BidResponse> result = bidService.getBidsByListing(listingId);
+            List<BidResponse> result = bidService.getBidsByListing(listingId, viewerId);
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).listingId()).isEqualTo(listingId);
@@ -429,7 +436,7 @@ class BidServiceTest {
 
         @Test
         void nullListingId_throws() {
-            assertThatThrownBy(() -> bidService.getHighestBid(null))
+            assertThatThrownBy(() -> bidService.getHighestBid(null, null))
                     .isInstanceOf(BidValidationException.class)
                     .hasMessageContaining("listingId wajib diisi.");
         }
@@ -440,7 +447,7 @@ class BidServiceTest {
             when(bidRepository.findTopByListingIdOrderByAmountDescCreatedAtAsc(listingId))
                     .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> bidService.getHighestBid(listingId))
+            assertThatThrownBy(() -> bidService.getHighestBid(listingId, null))
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessageContaining(listingId.toString());
         }
@@ -452,7 +459,7 @@ class BidServiceTest {
             when(bidRepository.findTopByListingIdOrderByAmountDescCreatedAtAsc(listingId))
                     .thenReturn(Optional.of(highest));
 
-            BidResponse result = bidService.getHighestBid(listingId);
+            BidResponse result = bidService.getHighestBid(listingId, null);
 
             assertThat(result.amount()).isEqualByComparingTo(new BigDecimal("500.00"));
         }

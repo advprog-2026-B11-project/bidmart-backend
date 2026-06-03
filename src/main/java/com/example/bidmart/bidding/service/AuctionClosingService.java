@@ -28,6 +28,11 @@ public class AuctionClosingService {
     private final WalletService walletService;
     private final ApplicationEventPublisher eventPublisher;
 
+    
+    
+    // Closes an expired auction normally (called by the scheduler).
+    // Settles payment for the winner or releases all holds if no winner 
+    
     @Transactional
     public void closeAuction(Listing listing) {
         if (listing.getStatus().isFinal()) return;
@@ -57,11 +62,28 @@ public class AuctionClosingService {
 
             releaseAllHolds(listing);
 
-                eventPublisher.publishEvent(new AuctionClosedNoWinnerEvent(
+            eventPublisher.publishEvent(new AuctionClosedNoWinnerEvent(
                     listing.getId(),
                     listing.getSellerId()
-                ));
+            ));
         }
+    }
+
+    // Forcefully cancels an active auction ( di admin action).
+    // Releases all held funds and sets status to CLOSED.
+    @Transactional
+    public void cancelAuction(Listing listing) {
+        if (listing.getStatus().isFinal()) return;
+
+        listing.setStatus(AuctionStatus.CLOSED);
+        listingRepository.save(listing);
+
+        releaseAllHolds(listing);
+
+        eventPublisher.publishEvent(new AuctionClosedNoWinnerEvent(
+                listing.getId(),
+                listing.getSellerId()
+        ));
     }
 
     private void releaseLoserHolds(Listing listing) {

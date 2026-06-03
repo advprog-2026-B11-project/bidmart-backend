@@ -5,6 +5,7 @@ import com.example.bidmart.bidding.dto.CreateBidRequest;
 import com.example.bidmart.bidding.exception.BidConflictException;
 import com.example.bidmart.bidding.exception.BidTooLowException;
 import com.example.bidmart.bidding.exception.BidValidationException;
+import com.example.bidmart.bidding.exception.ProxyChallengerOutbidException;
 import com.example.bidmart.bidding.exception.ResourceNotFoundException;
 import com.example.bidmart.bidding.model.Bid;
 import com.example.bidmart.bidding.repository.BidRepository;
@@ -40,6 +41,7 @@ public class BidService {
     private final BidRuleValidator bidRuleValidator;
     private final ApplicationEventPublisher eventPublisher;
     private final AuctionStrategyRegistry strategyRegistry;
+    private final ProxyBiddingEngine proxyEngine;
 
     public BidService(
             BidRepository bidRepository,
@@ -47,7 +49,8 @@ public class BidService {
             WalletService walletService,
             BidRuleValidator bidRuleValidator,
             ApplicationEventPublisher eventPublisher,
-            AuctionStrategyRegistry strategyRegistry
+            AuctionStrategyRegistry strategyRegistry,
+            ProxyBiddingEngine proxyEngine
     ) {
         this.bidRepository = bidRepository;
         this.listingService = listingService;
@@ -55,6 +58,7 @@ public class BidService {
         this.bidRuleValidator = bidRuleValidator;
         this.eventPublisher = eventPublisher;
         this.strategyRegistry = strategyRegistry;
+        this.proxyEngine = proxyEngine;
     }
 
     @Retryable(
@@ -62,7 +66,7 @@ public class BidService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 50, multiplier = 2)
     )
-    @Transactional
+    @Transactional(noRollbackFor = ProxyChallengerOutbidException.class)
     public BidResponse placeBid(UUID buyerId, CreateBidRequest request) {
         bidRuleValidator.validateRequest(request, buyerId);
 
@@ -76,20 +80,46 @@ public class BidService {
         Optional<Bid> currentHighestBid = bidRepository
                 .findTopByListingIdOrderByAmountDescCreatedAtAsc(request.listingId());
 
+        boolean isProxyRequest = Boolean.TRUE.equals(request.proxyBid());
+        boolean isBuyerCurrentWinner = currentHighestBid
+                .map(b -> b.getBuyerId().equals(buyerId))
+                .orElse(false);
+        boolean currentWinnerHasActiveProxy = currentHighestBid
+                .map(b -> Boolean.TRUE.equals(b.getProxyBid()))
+                .orElse(false);
+
+        // Phase 1: structural + auction-open + seller check (amount skipped for highest bidder)
         bidRuleValidator.validateBidContext(buyerId, listing, request.amount(), currentHighestBid);
 
-        ValidationResult strategyResult = strategy.validateBid(request.amount(), listing);
-        if (!strategyResult.valid()) {
-            throw new BidTooLowException(strategyResult.errorMessage(),
-                    strategy.computeMinimumNextBid(listing));
+        // Phase 2: validate re-bid rules only when buyer is currently winning with a proxy
+        if (isBuyerCurrentWinner && currentWinnerHasActiveProxy) {
+            BigDecimal maxLimitForValidation = isProxyRequest ? request.proxyMaxLimit() : BigDecimal.ZERO;
+            proxyEngine.validateAndGetActiveProxy(
+                    buyerId, request.listingId(), isProxyRequest, request.amount(), maxLimitForValidation);
         }
 
-        boolean proxyBid = Boolean.TRUE.equals(request.proxyBid());
-        BigDecimal reserveTarget = proxyBid ? request.proxyMaxLimit() : request.amount();
+        // Phase 3: standard strategy amount check — only for challengers (not current winner)
+        if (!isBuyerCurrentWinner) {
+            ValidationResult strategyResult = strategy.validateBid(request.amount(), listing);
+            if (!strategyResult.valid()) {
+                throw new BidTooLowException(strategyResult.errorMessage(),
+                        strategy.computeMinimumNextBid(listing));
+            }
+        }
 
+        // Phase 4: proxy conflict resolution — delegate entirely to ProxyBiddingEngine
+        if (!isBuyerCurrentWinner && currentWinnerHasActiveProxy) {
+            if (isProxyRequest) {
+                return proxyEngine.handleProxyVsProxy(buyerId, request, listingEntity, currentHighestBid.get());
+            }
+            return proxyEngine.handleManualVsProxy(buyerId, request, listingEntity, currentHighestBid.get());
+        }
+
+
+        // Phase 5: reserve funds (wallet service calculates the incremental delta)
+        BigDecimal reserveTarget = isProxyRequest ? request.proxyMaxLimit() : request.amount();
         Optional<Bid> latestBidByBuyer = bidRepository
                 .findTopByListingIdAndBuyerIdOrderByCreatedAtDesc(request.listingId(), buyerId);
-
         BigDecimal previousReservedAmount = latestBidByBuyer
                 .map(Bid::getReservedAmount)
                 .orElse(BigDecimal.ZERO);
@@ -98,36 +128,26 @@ public class BidService {
             walletService.reserveBidFunds(buyerId, request.listingId(), reserveTarget);
         }
 
-        Bid bid = new Bid();
-        bid.setListingId(request.listingId());
-        bid.setBuyerId(buyerId);
-        bid.setAmount(request.amount());
-        bid.setProxyBid(proxyBid);
-        bid.setProxyMaxLimit(proxyBid ? request.proxyMaxLimit() : null);
-
+        // Phase 6: persist bid and update listing
+        Bid bid = buildBid(request.listingId(), buyerId, request.amount(), isProxyRequest,
+                isProxyRequest ? request.proxyMaxLimit() : null);
         Bid savedBid = bidRepository.save(bid);
-
         listingEntity.updateHighestBid(savedBid.getBuyerId(), savedBid.getAmount());
 
-        boolean extended = false;
-        if (listingEntity.isWithinAntiSnipingWindow()) {
-            listingEntity.extendAuction();
-            extended = true;
-        }
-
+        boolean extended = handleAntiSnipe(listingEntity);
         listingService.save(listingEntity);
 
+        // Phase 7: release previous highest bidder's funds (skips same-user)
         releaseOutbidFunds(currentHighestBid, savedBid)
                 .ifPresent(outbid -> eventPublisher.publishEvent(
                         new OutbidEvent(savedBid.getListingId(), outbid.getBuyerId(), savedBid.getAmount())));
 
         eventPublisher.publishEvent(new BidPlacedEvent(
-            savedBid.getId(),
-            savedBid.getListingId(),
-            savedBid.getBuyerId(),
-            savedBid.getAmount()
+                savedBid.getId(), 
+                savedBid.getListingId(), 
+                savedBid.getBuyerId(), 
+                savedBid.getAmount()
         ));
-
         if (extended) {
             eventPublisher.publishEvent(new AuctionExtendedEvent(
                 listingEntity.getId(), listingEntity.getSellerId()));
@@ -155,17 +175,21 @@ public class BidService {
         return strategy.computeMinimumNextBid(toSnapshot(listingEntity));
     }
 
-    public List<BidResponse> getBidsByListing(UUID listingId) {
+    
+//      Returns bids for a listing with privacy masking: {@code proxyMaxLimit} is hidden
+//      for bids not owned by {@code viewerId}.
+     
+    public List<BidResponse> getBidsByListing(UUID listingId, UUID viewerId) {
         if (listingId == null) {
             throw new BidValidationException("listingId wajib diisi.");
         }
 
         return bidRepository.findByListingIdOrderByCreatedAtDesc(listingId).stream()
-                .map(BidResponse::from)
+                .map(bid -> BidResponse.from(bid, viewerId))
                 .toList();
     }
 
-    public BidResponse getHighestBid(UUID listingId) {
+    public BidResponse getHighestBid(UUID listingId, UUID viewerId) {
         if (listingId == null) {
             throw new BidValidationException("listingId wajib diisi.");
         }
@@ -174,7 +198,7 @@ public class BidService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Belum ada bid untuk listing: " + listingId));
 
-        return BidResponse.from(highestBid);
+        return BidResponse.from(highestBid, viewerId);
     }
 
     public List<BidResponse> getBidsByBuyer(UUID buyerId) {
@@ -185,6 +209,25 @@ public class BidService {
         return bidRepository.findByBuyerIdOrderByCreatedAtDesc(buyerId).stream()
                 .map(BidResponse::from)
                 .toList();
+    }
+
+    private boolean handleAntiSnipe(Listing listingEntity) {
+        if (listingEntity.isWithinAntiSnipingWindow()) {
+            listingEntity.extendAuction();
+            return true;
+        }
+        return false;
+    }
+
+    private Bid buildBid(UUID listingId, UUID buyerId, BigDecimal amount,
+                         boolean isProxy, BigDecimal proxyMaxLimit) {
+        Bid bid = new Bid();
+        bid.setListingId(listingId);
+        bid.setBuyerId(buyerId);
+        bid.setAmount(amount);
+        bid.setProxyBid(isProxy);
+        bid.setProxyMaxLimit(proxyMaxLimit);
+        return bid;
     }
 
     private ListingSnapshot toSnapshot(Listing listing) {
