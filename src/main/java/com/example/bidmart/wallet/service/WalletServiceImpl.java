@@ -1,9 +1,20 @@
 package com.example.bidmart.wallet.service;
 
-import com.example.bidmart.common.event.*;
+import com.example.bidmart.common.event.BalanceHeldEvent;
+import com.example.bidmart.common.event.BalanceIncomeEvent;
+import com.example.bidmart.common.event.BalanceReleasedEvent;
+import com.example.bidmart.common.event.BalanceSettledEvent;
+import com.example.bidmart.common.event.BalanceTopUpEvent;
+import com.example.bidmart.common.event.WithdrawEvent;
+import com.example.bidmart.common.util.IdempotencyKeyGenerator;
 import com.example.bidmart.wallet.dto.TopUpRequest;
 import com.example.bidmart.wallet.dto.WithdrawRequest;
-import com.example.bidmart.wallet.exception.*;
+import com.example.bidmart.wallet.exception.InsufficientBalanceException;
+import com.example.bidmart.wallet.exception.InvalidAmountException;
+import com.example.bidmart.wallet.exception.InvalidRequestException;
+import com.example.bidmart.wallet.exception.UnauthorizedException;
+import com.example.bidmart.wallet.exception.WalletAlreadyExistsException;
+import com.example.bidmart.wallet.exception.WalletNotFoundException;
 import com.example.bidmart.wallet.model.PaymentMethod;
 import com.example.bidmart.wallet.model.Transaction;
 import com.example.bidmart.wallet.model.TransactionType;
@@ -18,8 +29,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,6 +58,35 @@ public class WalletServiceImpl implements WalletService {
         this.eventPublisher = eventPublisher;
     }
 
+    /**
+     * Functional interface representing an atomic operation on a Wallet.
+     * Returns an Optional of Transaction to be saved, or Optional.empty() if no DB change is needed.
+     */
+    @FunctionalInterface
+    private interface WalletMutation {
+        Optional<Transaction> apply(Wallet wallet);
+    }
+
+    /**
+     * Central execution point for all wallet mutations.
+     * Handles idempotency check, pessimistic lock acquisition, wallet save, and transaction record creation.
+     */
+    private Wallet executeMutation(UUID userId, String idempotencyKey, WalletMutation mutation) {
+        Optional<Wallet> existing = checkIdempotency(idempotencyKey, userId);
+        if (existing.isPresent()) return existing.get();
+
+        Wallet wallet = getWalletByUserIdWithLock(userId);
+        Optional<Transaction> transactionOptional = mutation.apply(wallet);
+        
+        transactionOptional.ifPresent(transaction -> {
+            walletRepository.save(wallet);
+            transaction.setIdempotencyKey(idempotencyKey);
+            transactionRepository.save(transaction);
+        });
+        
+        return wallet;
+    }
+
     @Override
     @Transactional
     public Wallet createWallet(UUID userId) {
@@ -68,214 +110,127 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public Wallet topUp(UUID userId, TopUpRequest request) {
-        Optional<Wallet> existing = checkIdempotency(request.getIdempotencyKey(), userId);
-        if (existing.isPresent()) return existing.get();
-
         validateAmount(request.getAmount());
         validateTopUpAmount(request.getAmount());
 
-        PaymentStrategy strategy = resolvePaymentStrategy(request.getMethod());
-        strategy.validateDetails(request.getPaymentDetails());
+        PaymentStrategy paymentStrategy = resolvePaymentStrategy(request.getMethod());
+        paymentStrategy.validateDetails(request.getPaymentDetails());
 
-        Wallet wallet = getWalletByUserIdWithLock(userId);
-        wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(request.getAmount()));
-        wallet = walletRepository.save(wallet);
-
-        String note = strategy.generateTransactionNote("TOPUP", request.getAmount(), request.getPaymentDetails());
-        Transaction tx = new Transaction(wallet.getId(), TransactionType.TOPUP, request.getAmount(), note);
-        tx.setIdempotencyKey(request.getIdempotencyKey());
-        transactionRepository.save(tx);
-
-        eventPublisher.publishEvent(
-                new BalanceTopUpEvent(userId, request.getAmount(), request.getMethod().toString())
-        );
-
-        return wallet;
+        return executeMutation(userId, request.getIdempotencyKey(), wallet -> {
+            wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(request.getAmount()));
+            
+            eventPublisher.publishEvent(new BalanceTopUpEvent(userId, request.getAmount(), request.getMethod().toString()));
+            
+            String transactionNote = paymentStrategy.generateTransactionNote(TransactionType.TOPUP, request.getAmount(), request.getPaymentDetails());
+            return Optional.of(new Transaction(wallet.getId(), TransactionType.TOPUP, request.getAmount(), transactionNote));
+        });
     }
 
     @Override
     @Transactional
     public Wallet withdraw(UUID userId, WithdrawRequest request) {
-        Optional<Wallet> existing = checkIdempotency(request.getIdempotencyKey(), userId);
-        if (existing.isPresent()) return existing.get();
-
         validateAmount(request.getAmount());
 
-        PaymentStrategy strategy = resolvePaymentStrategy(request.getMethod());
-        strategy.validateDetails(request.getPaymentDetails());
+        PaymentStrategy paymentStrategy = resolvePaymentStrategy(request.getMethod());
+        paymentStrategy.validateDetails(request.getPaymentDetails());
 
-        Wallet wallet = getWalletByUserIdWithLock(userId);
-        if (wallet.getBalanceAvailable().compareTo(request.getAmount()) < 0) {
-            throw new InsufficientBalanceException(
-                    "Saldo tidak mencukupi. Dibutuhkan: " + request.getAmount() + ", tersedia: " + wallet.getBalanceAvailable());
-        }
+        return executeMutation(userId, request.getIdempotencyKey(), wallet -> {
+            validateSufficientBalance(wallet, request.getAmount());
 
-        wallet.setBalanceAvailable(wallet.getBalanceAvailable().subtract(request.getAmount()));
-        wallet = walletRepository.save(wallet);
-
-        String note = strategy.generateTransactionNote("WITHDRAW", request.getAmount(), request.getPaymentDetails());
-        Transaction tx = new Transaction(wallet.getId(), TransactionType.WITHDRAWAL, request.getAmount(), note);
-        tx.setIdempotencyKey(request.getIdempotencyKey());
-        transactionRepository.save(tx);
-
-        String bankName = request.getPaymentDetails() != null ? request.getPaymentDetails().toString() : "Bank";
-        eventPublisher.publishEvent(new WithdrawEvent(userId, request.getAmount(), bankName));
-
-        return wallet;
-    }
-
-    @Override
-    public Wallet reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal reserveTarget) {
-        String key = generateDeterministicKey("HOLD", buyerId, listingId.toString(), reserveTarget);
-        return reserveBidFunds(buyerId, listingId, reserveTarget, key);
+            wallet.setBalanceAvailable(wallet.getBalanceAvailable().subtract(request.getAmount()));
+            
+            String withdrawalDestination = request.getPaymentDetails() != null ? request.getPaymentDetails().toString() : request.getMethod().name();
+            eventPublisher.publishEvent(new WithdrawEvent(userId, request.getAmount(), withdrawalDestination));
+            
+            String transactionNote = paymentStrategy.generateTransactionNote(TransactionType.WITHDRAWAL, request.getAmount(), request.getPaymentDetails());
+            return Optional.of(new Transaction(wallet.getId(), TransactionType.WITHDRAWAL, request.getAmount(), transactionNote));
+        });
     }
 
     @Override
     @Transactional
     public Wallet reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal reserveTarget, String idempotencyKey) {
-        Optional<Wallet> existing = checkIdempotency(idempotencyKey, buyerId);
-        if (existing.isPresent()) return existing.get();
-
         validateAmount(reserveTarget);
 
-        Wallet wallet = getWalletByUserIdWithLock(buyerId);
-        String refId = listingId.toString();
+        return executeMutation(buyerId, idempotencyKey, wallet -> {
+            String referenceId = listingId.toString();
+            BigDecimal currentlyHeld = calculateHeldForReference(wallet.getId(), referenceId);
 
-        BigDecimal currentlyHeld = calculateHeldForReference(wallet.getId(), refId);
+            if (isReserveTargetMet(reserveTarget, currentlyHeld)) {
+                return Optional.empty();
+            }
 
-        if (reserveTarget.compareTo(currentlyHeld) <= 0) {
-            return wallet;
-        }
+            BigDecimal additionalLock = reserveTarget.subtract(currentlyHeld);
+            validateSufficientBalance(wallet, additionalLock);
 
-        BigDecimal additionalLock = reserveTarget.subtract(currentlyHeld);
+            lockBalance(wallet, additionalLock);
 
-        if (wallet.getBalanceAvailable().compareTo(additionalLock) < 0) {
-            throw new InsufficientBalanceException(
-                    "Saldo tidak mencukupi. Dibutuhkan: " + additionalLock + ", tersedia: " + wallet.getBalanceAvailable());
-        }
-
-        wallet.setBalanceAvailable(wallet.getBalanceAvailable().subtract(additionalLock));
-        wallet.setBalanceLocked(wallet.getBalanceLocked().add(additionalLock));
-        wallet = walletRepository.save(wallet);
-
-        Transaction tx = new Transaction(wallet.getId(), TransactionType.HOLD, additionalLock, refId);
-        tx.setIdempotencyKey(idempotencyKey);
-        transactionRepository.save(tx);
-
-        eventPublisher.publishEvent(new BalanceHeldEvent(buyerId, additionalLock, listingId));
-
-        return wallet;
-    }
-
-    @Override
-    public Wallet releaseBidFunds(UUID buyerId, UUID listingId, BigDecimal releaseAmount) {
-        String key = generateDeterministicKey("RELEASE", buyerId, listingId.toString(), releaseAmount);
-        return releaseBidFunds(buyerId, listingId, releaseAmount, key);
+            eventPublisher.publishEvent(new BalanceHeldEvent(buyerId, additionalLock, listingId));
+            return Optional.of(new Transaction(wallet.getId(), TransactionType.HOLD, additionalLock, referenceId));
+        });
     }
 
     @Override
     @Transactional
     public Wallet releaseBidFunds(UUID buyerId, UUID listingId, BigDecimal releaseAmount, String idempotencyKey) {
-        Optional<Wallet> existing = checkIdempotency(idempotencyKey, buyerId);
-        if (existing.isPresent()) return existing.get();
-
         validateAmount(releaseAmount);
 
-        Wallet wallet = getWalletByUserIdWithLock(buyerId);
-        String refId = listingId.toString();
+        return executeMutation(buyerId, idempotencyKey, wallet -> {
+            String referenceId = listingId.toString();
+            BigDecimal currentlyHeld = calculateHeldForReference(wallet.getId(), referenceId);
+            
+            if (isNoBalanceHeld(currentlyHeld)) {
+                return Optional.empty();
+            }
 
-        BigDecimal currentlyHeld = calculateHeldForReference(wallet.getId(), refId);
-        if (currentlyHeld.compareTo(BigDecimal.ZERO) <= 0) {
-            return wallet;
-        }
+            BigDecimal actualRelease = currentlyHeld.min(releaseAmount);
 
-        BigDecimal actualRelease = currentlyHeld.min(releaseAmount);
+            unlockBalance(wallet, actualRelease);
 
-        wallet.setBalanceLocked(wallet.getBalanceLocked().subtract(actualRelease));
-        wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(actualRelease));
-        wallet = walletRepository.save(wallet);
-
-        Transaction tx = new Transaction(wallet.getId(), TransactionType.REFUND, actualRelease, refId);
-        tx.setIdempotencyKey(idempotencyKey);
-        transactionRepository.save(tx);
-
-        eventPublisher.publishEvent(new BalanceReleasedEvent(buyerId, actualRelease, listingId));
-
-        return wallet;
-    }
-
-    @Override
-    public Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId) {
-        String key = generateDeterministicKey("SETTLE", userId, referenceId, amount);
-        return settlePayment(userId, amount, referenceId, key);
+            eventPublisher.publishEvent(new BalanceReleasedEvent(buyerId, actualRelease, listingId));
+            return Optional.of(new Transaction(wallet.getId(), TransactionType.REFUND, actualRelease, referenceId));
+        });
     }
 
     @Override
     @Transactional
     public Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId, String idempotencyKey) {
-        Optional<Wallet> existing = checkIdempotency(idempotencyKey, userId);
-        if (existing.isPresent()) return existing.get();
-
         validateAmount(amount);
 
-        Wallet wallet = getWalletByUserIdWithLock(userId);
+        return executeMutation(userId, idempotencyKey, wallet -> {
+            BigDecimal heldForReference = calculateHeldForReference(wallet.getId(), referenceId);
+            validateSettlementAmount(amount, heldForReference);
 
-        BigDecimal heldForReference = calculateHeldForReference(wallet.getId(), referenceId);
-        if (amount.compareTo(heldForReference) > 0) {
-            throw new InvalidAmountException(
-                    "Jumlah settlement melebihi saldo yang ditahan. Ditahan: " + heldForReference + ", diminta: " + amount);
-        }
+            wallet.setBalanceLocked(wallet.getBalanceLocked().subtract(amount));
 
-        wallet.setBalanceLocked(wallet.getBalanceLocked().subtract(amount));
-        wallet = walletRepository.save(wallet);
-
-        Transaction tx = new Transaction(wallet.getId(), TransactionType.PAYMENT, amount, referenceId);
-        tx.setIdempotencyKey(idempotencyKey);
-        transactionRepository.save(tx);
-
-        eventPublisher.publishEvent(new BalanceSettledEvent(userId, amount, referenceId));
-
-        return wallet;
-    }
-
-    @Override
-    public Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId) {
-        String key = generateDeterministicKey("DELIVERY", sellerId, referenceId, amount);
-        return confirmDelivery(sellerId, amount, referenceId, key);
+            eventPublisher.publishEvent(new BalanceSettledEvent(userId, amount, referenceId));
+            return Optional.of(new Transaction(wallet.getId(), TransactionType.PAYMENT, amount, referenceId));
+        });
     }
 
     @Override
     @Transactional
     public Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId, String idempotencyKey) {
-        Optional<Wallet> existing = checkIdempotency(idempotencyKey, sellerId);
-        if (existing.isPresent()) return existing.get();
-
         validateAmount(amount);
 
-        Wallet sellerWallet = getWalletByUserIdWithLock(sellerId);
-        sellerWallet.setBalanceAvailable(sellerWallet.getBalanceAvailable().add(amount));
-        sellerWallet = walletRepository.save(sellerWallet);
+        return executeMutation(sellerId, idempotencyKey, wallet -> {
+            wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(amount));
 
-        Transaction tx = new Transaction(sellerWallet.getId(), TransactionType.INCOME, amount, referenceId);
-        tx.setIdempotencyKey(idempotencyKey);
-        transactionRepository.save(tx);
-
-        eventPublisher.publishEvent(new BalanceIncomeEvent(sellerId, amount, referenceId));
-
-        return sellerWallet;
+            eventPublisher.publishEvent(new BalanceIncomeEvent(sellerId, amount, referenceId));
+            return Optional.of(new Transaction(wallet.getId(), TransactionType.INCOME, amount, referenceId));
+        });
     }
 
     @Override
     @Transactional
-    public void completeOrderPayment(UUID orderId, UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount) {
+    public void creditSellerAfterDelivery(UUID orderId, UUID listingId, UUID sellerId, BigDecimal amount) {
         String referenceId = listingId.toString();
-        settlePayment(buyerId, amount, referenceId, "order-settle-" + orderId);
         confirmDelivery(sellerId, amount, referenceId, "order-income-" + orderId);
     }
 
     @Override
     @Transactional
-    public void refundOrderPayment(UUID orderId, UUID listingId, UUID buyerId, BigDecimal amount) {
+    public void refundBuyerForOrder(UUID orderId, UUID listingId, UUID buyerId, BigDecimal amount) {
         releaseBidFunds(buyerId, listingId, amount, "order-refund-" + orderId);
     }
 
@@ -305,56 +260,81 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void releaseAllHoldsForUser(UUID userId) {
-        Optional<Wallet> walletOpt = walletRepository.findByUserIdWithLock(userId);
-        if (walletOpt.isEmpty()) {
+        Optional<Wallet> lockedWallet = walletRepository.findByUserIdWithLock(userId);
+ 
+        if (lockedWallet.isEmpty()) {
             log.info("No wallet found for deactivated user: {}", userId);
             return;
         }
-
-        Wallet wallet = walletOpt.get();
-        if (wallet.getBalanceLocked().compareTo(BigDecimal.ZERO) <= 0) {
+ 
+        Wallet wallet = lockedWallet.get();
+ 
+        if (hasNoLockedBalance(wallet)) {
             log.info("No locked balance for user: {}", userId);
             return;
         }
-
-        List<Transaction> holdTxs = transactionRepository.findByWalletIdAndType(wallet.getId(), TransactionType.HOLD);
-
-        Set<String> referenceIds = holdTxs.stream()
-                .map(Transaction::getReferenceId)
-                .collect(Collectors.toSet());
-
-        BigDecimal totalReleased = BigDecimal.ZERO;
-
-        for (String refId : referenceIds) {
-            BigDecimal netHeld = calculateHeldForReference(wallet.getId(), refId);
-            if (netHeld.compareTo(BigDecimal.ZERO) > 0) {
-                Transaction refundTx = new Transaction(wallet.getId(), TransactionType.REFUND, netHeld, refId);
-                transactionRepository.save(refundTx);
-                totalReleased = totalReleased.add(netHeld);
-
-                try {
-                    eventPublisher.publishEvent(
-                            new BalanceReleasedEvent(userId, netHeld, UUID.fromString(refId))
-                    );
-                } catch (IllegalArgumentException e) {
-                    log.warn("Could not parse referenceId as UUID for event: {}", refId);
-                }
-            }
-        }
-
-        if (totalReleased.compareTo(BigDecimal.ZERO) > 0) {
-            wallet.setBalanceLocked(wallet.getBalanceLocked().subtract(totalReleased));
-            wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(totalReleased));
+ 
+        BigDecimal totalReleasedAmount = releaseAllHoldsFromWallet(wallet, userId);
+ 
+        if (totalReleasedAmount.compareTo(BigDecimal.ZERO) > 0) {
+            unlockBalance(wallet, totalReleasedAmount);
             walletRepository.save(wallet);
-            log.info("Released total {} from locked balance for deactivated user: {}", totalReleased, userId);
+            log.info("Released total {} from locked balance for deactivated user: {}", totalReleasedAmount, userId);
         }
     }
-    
+ 
+    private boolean hasNoLockedBalance(Wallet wallet) {
+        return wallet.getBalanceLocked().compareTo(BigDecimal.ZERO) <= 0;
+    }
+ 
+    private BigDecimal releaseAllHoldsFromWallet(Wallet wallet, UUID userId) {
+        List<Transaction> holdTransactions = transactionRepository.findByWalletIdAndType(
+                wallet.getId(), TransactionType.HOLD
+        );
+ 
+        Set<String> uniqueReferenceIds = holdTransactions.stream()
+                .map(Transaction::getReferenceId)
+                .collect(Collectors.toSet());
+ 
+        BigDecimal totalReleasedAmount = BigDecimal.ZERO;
+ 
+        for (String referenceId : uniqueReferenceIds) {
+            BigDecimal netHeldAmount = calculateHeldForReference(wallet.getId(), referenceId);
+ 
+            if (netHeldAmount.compareTo(BigDecimal.ZERO) > 0) {
+                saveReleaseTransaction(wallet.getId(), userId, referenceId, netHeldAmount);
+                totalReleasedAmount = totalReleasedAmount.add(netHeldAmount);
+            }
+        }
+ 
+        return totalReleasedAmount;
+    }
+ 
+    private void saveReleaseTransaction(UUID walletId, UUID userId, String referenceId, BigDecimal releaseAmount) {
+        String idempotencyKey = IdempotencyKeyGenerator.generate("DEACTIVATION_RELEASE", userId, referenceId);
+ 
+        Transaction releaseTransaction = new Transaction(walletId, TransactionType.REFUND, releaseAmount, referenceId);
+        releaseTransaction.setIdempotencyKey(idempotencyKey);
+        transactionRepository.save(releaseTransaction);
+ 
+        publishReleaseEvent(userId, releaseAmount, referenceId);
+    }
+ 
+    private void publishReleaseEvent(UUID userId, BigDecimal releaseAmount, String referenceId) {
+        try {
+            eventPublisher.publishEvent(
+                    new BalanceReleasedEvent(userId, releaseAmount, UUID.fromString(referenceId))
+            );
+        } catch (IllegalArgumentException e) {
+            log.warn("referenceId is not a valid UUID, release event not published: {}", referenceId);
+        }
+    }
+ 
     private Wallet getWalletByUserIdWithLock(UUID userId) {
         return walletRepository.findByUserIdWithLock(userId)
                 .orElseGet(() -> {
-                    Wallet newWallet = new Wallet(userId);
-                    return walletRepository.save(newWallet);
+                    log.info("Auto-creating wallet for user: {}", userId);
+                    return walletRepository.save(new Wallet(userId));
                 });
     }
 
@@ -388,14 +368,41 @@ public class WalletServiceImpl implements WalletService {
         return netHeld.max(BigDecimal.ZERO);
     }
 
+    private void validateSufficientBalance(Wallet wallet, BigDecimal requiredAmount) {
+        if (wallet.getBalanceAvailable().compareTo(requiredAmount) < 0) {
+            throw new InsufficientBalanceException(
+                    "Saldo tidak mencukupi. Dibutuhkan: " + requiredAmount + ", tersedia: " + wallet.getBalanceAvailable());
+        }
+    }
+
+    private void validateSettlementAmount(BigDecimal requestedAmount, BigDecimal heldAmount) {
+        if (requestedAmount.compareTo(heldAmount) > 0) {
+            throw new InvalidAmountException(
+                    "Jumlah settlement melebihi saldo yang ditahan. Ditahan: " + heldAmount + ", diminta: " + requestedAmount);
+        }
+    }
+
+    private boolean isNoBalanceHeld(BigDecimal heldAmount) {
+        return heldAmount.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    private boolean isReserveTargetMet(BigDecimal reserveTarget, BigDecimal currentlyHeld) {
+        return reserveTarget.compareTo(currentlyHeld) <= 0;
+    }
+
+    private void lockBalance(Wallet wallet, BigDecimal amount) {
+        wallet.setBalanceAvailable(wallet.getBalanceAvailable().subtract(amount));
+        wallet.setBalanceLocked(wallet.getBalanceLocked().add(amount));
+    }
+
+    private void unlockBalance(Wallet wallet, BigDecimal amount) {
+        wallet.setBalanceLocked(wallet.getBalanceLocked().subtract(amount));
+        wallet.setBalanceAvailable(wallet.getBalanceAvailable().add(amount));
+    }
+
     private Optional<Wallet> checkIdempotency(String idempotencyKey, UUID userId) {
         if (idempotencyKey == null) return Optional.empty();
         return transactionRepository.findByIdempotencyKey(idempotencyKey)
-                .map(tx -> getWalletByUserId(userId));
-    }
-
-    private String generateDeterministicKey(String operation, UUID userId, String referenceId, BigDecimal amount) {
-        String raw = operation + ":" + userId + ":" + referenceId + ":" + amount.toPlainString();
-        return UUID.nameUUIDFromBytes(raw.getBytes(StandardCharsets.UTF_8)).toString();
+                .map(transaction -> getWalletByUserId(userId));
     }
 }

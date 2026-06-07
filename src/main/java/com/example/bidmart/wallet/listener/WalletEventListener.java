@@ -48,18 +48,17 @@ public class WalletEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderDelivered(OrderDeliveredEvent event) {
         try {
-            log.info("Completing order payment: orderId={}, buyerId={}, sellerId={}, amount={}",
-                    event.getOrderId(), event.getBuyerId(), event.getSellerId(), event.getAmount());
-            walletService.completeOrderPayment(
+            log.info("Crediting seller after delivery: orderId={}, sellerId={}, amount={}",
+                    event.getOrderId(), event.getSellerId(), event.getAmount());
+            walletService.creditSellerAfterDelivery(
                     event.getOrderId(),
                     event.getListingId(),
-                    event.getBuyerId(),
                     event.getSellerId(),
                     event.getAmount()
             );
-            log.info("Order payment completed: orderId={}", event.getOrderId());
+            log.info("Seller credited successfully: orderId={}", event.getOrderId());
         } catch (Exception e) {
-            log.error("Error completing order payment: orderId={}", event.getOrderId(), e);
+            log.error("Error crediting seller: orderId={}", event.getOrderId(), e);
         }
     }
 
@@ -67,17 +66,17 @@ public class WalletEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderRefunded(OrderRefundedEvent event) {
         try {
-            log.info("Refunding order payment: orderId={}, buyerId={}, amount={}",
+            log.info("Refunding buyer for order: orderId={}, buyerId={}, amount={}",
                     event.getOrderId(), event.getBuyerId(), event.getAmount());
-            walletService.refundOrderPayment(
+            walletService.refundBuyerForOrder(
                     event.getOrderId(),
                     event.getListingId(),
                     event.getBuyerId(),
                     event.getAmount()
             );
-            log.info("Order payment refunded: orderId={}", event.getOrderId());
+            log.info("Buyer refunded successfully: orderId={}", event.getOrderId());
         } catch (Exception e) {
-            log.error("Error refunding order payment: orderId={}", event.getOrderId(), e);
+            log.error("Error refunding buyer: orderId={}", event.getOrderId(), e);
         }
     }
 }

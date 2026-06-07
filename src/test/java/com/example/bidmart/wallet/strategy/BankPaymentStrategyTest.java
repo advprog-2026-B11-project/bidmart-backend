@@ -2,6 +2,7 @@ package com.example.bidmart.wallet.strategy;
 
 import com.example.bidmart.wallet.exception.InvalidRequestException;
 import com.example.bidmart.wallet.model.PaymentMethod;
+import com.example.bidmart.wallet.model.TransactionType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -34,13 +35,13 @@ class BankPaymentStrategyTest {
     }
 
     @Test void generateNote_topUp() {
-        String note = strategy.generateTransactionNote("TOPUP", new BigDecimal("50000"),
+        String note = strategy.generateTransactionNote(TransactionType.TOPUP, new BigDecimal("50000"),
                 Map.of("bankName", "BCA", "accountNumber", "123"));
         assertTrue(note.contains("Top-Up"));
         assertTrue(note.contains("BCA"));
     }
     @Test void generateNote_withdraw() {
-        String note = strategy.generateTransactionNote("WITHDRAW", new BigDecimal("50000"),
+        String note = strategy.generateTransactionNote(TransactionType.WITHDRAWAL, new BigDecimal("50000"),
                 Map.of("bankName", "Mandiri", "accountNumber", "456"));
         assertTrue(note.contains("Withdraw"));
         assertTrue(note.contains("Mandiri"));

@@ -7,6 +7,7 @@ import com.example.bidmart.common.event.AuctionWonEvent;
 import com.example.bidmart.listing.model.AuctionStatus;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.repository.ListingRepository;
+import com.example.bidmart.common.util.IdempotencyKeyGenerator;
 import com.example.bidmart.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,10 +42,12 @@ public class AuctionClosingService {
             listing.setStatus(AuctionStatus.WON);
             listingRepository.save(listing);
 
+            String settleKey = IdempotencyKeyGenerator.generate("AUCTION_SETTLE", listing.getCurrentHighestBidderId(), listing.getId(), listing.getCurrentHighestBid());
             walletService.settlePayment(
                     listing.getCurrentHighestBidderId(),
                     listing.getCurrentHighestBid(),
-                    listing.getId().toString()
+                    listing.getId().toString(),
+                    settleKey
             );
 
             releaseLoserHolds(listing);
@@ -94,7 +97,8 @@ public class AuctionClosingService {
             UUID buyerId = bid.getBuyerId();
             if (buyerId.equals(winnerId) || !processed.add(buyerId)) continue;
             try {
-                walletService.releaseBidFunds(buyerId, listing.getId(), bid.getReservedAmount());
+                String releaseKey = IdempotencyKeyGenerator.generate("AUCTION_RELEASE", buyerId, listing.getId(), bid.getReservedAmount());
+                walletService.releaseBidFunds(buyerId, listing.getId(), bid.getReservedAmount(), releaseKey);
             } catch (Exception e) {
                 log.warn("Failed to release hold for buyer {}: {}", buyerId, e.getMessage());
             }
@@ -108,7 +112,8 @@ public class AuctionClosingService {
             UUID buyerId = bid.getBuyerId();
             if (!processed.add(buyerId)) continue;
             try {
-                walletService.releaseBidFunds(buyerId, listing.getId(), bid.getReservedAmount());
+                String releaseKey = IdempotencyKeyGenerator.generate("AUCTION_RELEASE_ALL", buyerId, listing.getId(), bid.getReservedAmount());
+                walletService.releaseBidFunds(buyerId, listing.getId(), bid.getReservedAmount(), releaseKey);
             } catch (Exception e) {
                 log.warn("Failed to release hold for buyer {}: {}", buyerId, e.getMessage());
             }
