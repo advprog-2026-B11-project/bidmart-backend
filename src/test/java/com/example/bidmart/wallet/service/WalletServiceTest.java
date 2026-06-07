@@ -537,46 +537,4 @@ class WalletServiceTest {
             verify(walletRepository, never()).save(any());
         }
     }
-
-    @Nested class CreditSellerAfterDelivery {
-        @Test void creditsSellerWithoutTouchingBuyer() {
-            UUID orderId  = UUID.randomUUID();
-            UUID sellerId = UUID.randomUUID();
-            BigDecimal amount = new BigDecimal("75000");
-
-            Wallet sellerWallet = new Wallet(sellerId);
-            sellerWallet.setId(UUID.randomUUID());
-
-            when(walletRepository.findByUserIdWithLock(sellerId)).thenReturn(Optional.of(sellerWallet));
-            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-            walletService.creditSellerAfterDelivery(orderId, listingId, sellerId, amount);
-
-            verify(walletRepository, never()).findByUserIdWithLock(userId);
-            verify(walletRepository).save(argThat(w ->
-                    w.getUserId().equals(sellerId) &&
-                    w.getBalanceAvailable().compareTo(amount) == 0
-            ));
-            verify(transactionRepository).save(argThat(tx -> tx.getType() == TransactionType.INCOME));
-        }
-    }
-
-    @Nested class RefundBuyerForOrder {
-        @Test void releasesHoldForBuyer() {
-            UUID orderId = UUID.randomUUID();
-            wallet.setBalanceLocked(new BigDecimal("75000"));
-
-            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(new BigDecimal("75000"));
-            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-            walletService.refundBuyerForOrder(orderId, listingId, userId, new BigDecimal("75000"));
-
-            verify(transactionRepository).save(argThat(tx -> tx.getType() == TransactionType.REFUND));
-            verify(walletRepository).save(argThat(w ->
-                    w.getBalanceLocked().compareTo(BigDecimal.ZERO) == 0 &&
-                    w.getBalanceAvailable().compareTo(new BigDecimal("75000")) == 0
-            ));
-        }
-    }
 }

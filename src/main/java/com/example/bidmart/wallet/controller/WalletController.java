@@ -64,6 +64,14 @@ public class WalletController {
         return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
+    @PostMapping("/withdraw")
+    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_WITHDRAW)")
+    public ResponseEntity<WalletResponse> withdraw(Authentication authentication, @RequestBody WithdrawRequest request) {
+        UUID userId = resolveCurrentUserId(authentication);
+        Wallet wallet = walletService.withdraw(userId, request);
+        return ResponseEntity.ok(convertToWalletResponse(wallet));
+    }
+
     @GetMapping("/list")
     @PreAuthorize("hasRole('ADMIN') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_LIST)")
     public ResponseEntity<List<Wallet>> getAllWallets() {
@@ -106,14 +114,6 @@ public class WalletController {
                 request.getListingId().toString(),
                 request.getIdempotencyKey()
         );
-        return ResponseEntity.ok(convertToWalletResponse(wallet));
-    }
-
-    @PostMapping("/withdraw")
-    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_WITHDRAW)")
-    public ResponseEntity<WalletResponse> withdraw(Authentication authentication, @RequestBody WithdrawRequest request) {
-        UUID userId = resolveCurrentUserId(authentication);
-        Wallet wallet = walletService.withdraw(userId, request);
         return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
@@ -171,7 +171,6 @@ public class WalletController {
                 .map(User::getId)
                 .orElseThrow(() -> new UnauthorizedException("User tidak ditemukan."));
     }
-
 
     private WalletResponse convertToWalletResponse(Wallet wallet) {
         return WalletResponse.builder()
