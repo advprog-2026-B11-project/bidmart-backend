@@ -10,6 +10,7 @@ import com.example.bidmart.common.event.AuctionExtendedEvent;
 import com.example.bidmart.common.event.BidPlacedEvent;
 import com.example.bidmart.common.event.OutbidEvent;
 import com.example.bidmart.common.event.ProxyAutoBidEvent;
+import com.example.bidmart.common.util.IdempotencyKeyGenerator;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.wallet.service.WalletService;
@@ -109,9 +110,11 @@ public class ProxyBiddingEngine {
         ProxyResolution resolution = resolveManualChallenger(request.amount(), winningProxy);
 
         if (resolution.challengerWins()) {
-            walletService.reserveBidFunds(challengerBuyerId, request.listingId(), request.amount());
+            String holdKey = IdempotencyKeyGenerator.generate("PROXY_HOLD", challengerBuyerId, request.listingId(), request.amount());
+            walletService.reserveBidFunds(challengerBuyerId, request.listingId(), request.amount(), holdKey);
+            String releaseKey = IdempotencyKeyGenerator.generate("PROXY_RELEASE", winningProxy.getBuyerId(), request.listingId(), winningProxy.getReservedAmount());
             walletService.releaseBidFunds(winningProxy.getBuyerId(), request.listingId(),
-                    winningProxy.getReservedAmount());
+                    winningProxy.getReservedAmount(), releaseKey);
 
             Bid saved = bidRepository.save(buildBid(request.listingId(), challengerBuyerId,
                     request.amount(), false, null));
@@ -165,9 +168,11 @@ public class ProxyBiddingEngine {
         ProxyResolution resolution = resolveProxyVsProxy(existingProxy, request.proxyMaxLimit());
 
         if (resolution.challengerWins()) {
-            walletService.reserveBidFunds(newBuyerId, request.listingId(), request.proxyMaxLimit());
+            String holdKey = IdempotencyKeyGenerator.generate("PROXY_HOLD", newBuyerId, request.listingId(), request.proxyMaxLimit());
+            walletService.reserveBidFunds(newBuyerId, request.listingId(), request.proxyMaxLimit(), holdKey);
+            String releaseKey = IdempotencyKeyGenerator.generate("PROXY_RELEASE", existingProxy.getBuyerId(), request.listingId(), existingProxy.getReservedAmount());
             walletService.releaseBidFunds(existingProxy.getBuyerId(), request.listingId(),
-                    existingProxy.getReservedAmount());
+                    existingProxy.getReservedAmount(), releaseKey);
 
             BigDecimal visiblePrice = resolution.newVisiblePrice();
             Bid saved = bidRepository.save(buildBid(request.listingId(), newBuyerId,

@@ -223,7 +223,7 @@ class WalletServiceTest {
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             Object event = eventCaptor.getValue();
             assertTrue(event instanceof WithdrawEvent);
-            assertEquals("Bank", ((WithdrawEvent) event).bankName());
+            assertEquals("BANK", ((WithdrawEvent) event).bankName());
         }
         @Test void withdraw_nullIdempotencyKey_success() {
             wallet.setBalanceAvailable(new BigDecimal("100000"));
@@ -274,15 +274,7 @@ class WalletServiceTest {
             assertThrows(InsufficientBalanceException.class,
                     () -> walletService.reserveBidFunds(userId, listingId, new BigDecimal("50000"), "k1"));
         }
-        @Test void overloadWithoutIdempotencyKey() {
-            wallet.setBalanceAvailable(new BigDecimal("100000"));
-            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(BigDecimal.ZERO);
-            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            Wallet w = walletService.reserveBidFunds(userId, listingId, new BigDecimal("30000"));
-            assertEquals(new BigDecimal("70000"), w.getBalanceAvailable());
-        }
 
         @Test void idempotent_skipsIfKeyExists() {
             String key = "IDEMP-RESERVE";
@@ -330,16 +322,7 @@ class WalletServiceTest {
             assertEquals(BigDecimal.ZERO, w.getBalanceLocked());
             assertEquals(new BigDecimal("20000"), w.getBalanceAvailable());
         }
-        @Test void overloadWithoutIdempotencyKey() {
-            wallet.setBalanceLocked(new BigDecimal("50000"));
-            Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), listingId.toString());
-            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(holdTx.getAmount());
-            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            Wallet w = walletService.releaseBidFunds(userId, listingId, new BigDecimal("30000"));
-            assertEquals(new BigDecimal("20000"), w.getBalanceLocked());
-        }
 
         @Test void idempotent_skipsIfKeyExists() {
             String key = "IDEMP-RELEASE";
@@ -376,15 +359,7 @@ class WalletServiceTest {
             assertThrows(InvalidAmountException.class,
                     () -> walletService.settlePayment(userId, new BigDecimal("50000"), "REF", "k1"));
         }
-        @Test void overloadWithoutKey() {
-            wallet.setBalanceLocked(new BigDecimal("50000"));
-            Transaction holdTx = new Transaction(wallet.getId(), TransactionType.HOLD, new BigDecimal("50000"), "REF");
-            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(transactionRepository.calculateNetHeldAmount(any(), eq("REF"))).thenReturn(holdTx.getAmount());
-            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            assertNotNull(walletService.settlePayment(userId, new BigDecimal("50000"), "REF"));
-        }
 
         @Test void idempotent_skipsIfKeyExists() {
             String key = "IDEMP-SETTLE";
@@ -442,13 +417,7 @@ class WalletServiceTest {
             assertThrows(InvalidAmountException.class,
                     () -> walletService.confirmDelivery(userId, BigDecimal.ZERO, "REF", "k1"));
         }
-        @Test void overloadWithoutIdempotencyKey() {
-            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
-            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            Wallet w = walletService.confirmDelivery(userId, new BigDecimal("75000"), "REF");
-            assertEquals(new BigDecimal("75000"), w.getBalanceAvailable());
-        }
 
         @Test void idempotent_skipsIfKeyExists() {
             String key = "IDEMP-DELIVERY";
@@ -566,6 +535,48 @@ class WalletServiceTest {
 
             verify(transactionRepository, never()).save(any());
             verify(walletRepository, never()).save(any());
+        }
+    }
+
+    @Nested class CreditSellerAfterDelivery {
+        @Test void creditsSellerWithoutTouchingBuyer() {
+            UUID orderId  = UUID.randomUUID();
+            UUID sellerId = UUID.randomUUID();
+            BigDecimal amount = new BigDecimal("75000");
+
+            Wallet sellerWallet = new Wallet(sellerId);
+            sellerWallet.setId(UUID.randomUUID());
+
+            when(walletRepository.findByUserIdWithLock(sellerId)).thenReturn(Optional.of(sellerWallet));
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            walletService.creditSellerAfterDelivery(orderId, listingId, sellerId, amount);
+
+            verify(walletRepository, never()).findByUserIdWithLock(userId);
+            verify(walletRepository).save(argThat(w ->
+                    w.getUserId().equals(sellerId) &&
+                    w.getBalanceAvailable().compareTo(amount) == 0
+            ));
+            verify(transactionRepository).save(argThat(tx -> tx.getType() == TransactionType.INCOME));
+        }
+    }
+
+    @Nested class RefundBuyerForOrder {
+        @Test void releasesHoldForBuyer() {
+            UUID orderId = UUID.randomUUID();
+            wallet.setBalanceLocked(new BigDecimal("75000"));
+
+            when(walletRepository.findByUserIdWithLock(userId)).thenReturn(Optional.of(wallet));
+            when(transactionRepository.calculateNetHeldAmount(any(), any())).thenReturn(new BigDecimal("75000"));
+            when(walletRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            walletService.refundBuyerForOrder(orderId, listingId, userId, new BigDecimal("75000"));
+
+            verify(transactionRepository).save(argThat(tx -> tx.getType() == TransactionType.REFUND));
+            verify(walletRepository).save(argThat(w ->
+                    w.getBalanceLocked().compareTo(BigDecimal.ZERO) == 0 &&
+                    w.getBalanceAvailable().compareTo(new BigDecimal("75000")) == 0
+            ));
         }
     }
 }

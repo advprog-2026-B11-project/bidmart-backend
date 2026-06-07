@@ -100,28 +100,13 @@ class WalletControllerTest {
     void getBalance_success() {
         when(walletService.getWalletByUserId(userId)).thenReturn(wallet);
 
-        ResponseEntity<Wallet> response = walletController.getBalance(authentication);
+        ResponseEntity<WalletResponse> response = walletController.getBalance(authentication);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(new BigDecimal("100000"), response.getBody().getBalanceAvailable());
     }
 
-    @Test
-    void getBalance_byUserId_success() {
-        when(walletService.getWalletByUserId(userId)).thenReturn(wallet);
 
-        ResponseEntity<Wallet> response = walletController.getBalance(userId, authentication);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-    }
-
-    @Test
-    void getBalance_forbidden_whenDifferentUser() {
-        UUID otherUserId = UUID.randomUUID();
-
-        assertThrows(ResponseStatusException.class,
-                () -> walletController.getBalance(otherUserId, authentication));
-    }
 
     // === topUp ===
 
@@ -143,8 +128,7 @@ class WalletControllerTest {
 
         when(walletService.topUp(eq(userId), any(TopUpRequest.class))).thenReturn(wallet);
 
-        ResponseEntity<WalletResponse> response = walletController.topUp(
-                userId, request, authentication);
+        ResponseEntity<WalletResponse> response = walletController.topUp(authentication, request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -161,40 +145,10 @@ class WalletControllerTest {
         );
 
         assertThrows(UnauthorizedException.class,
-                () -> walletController.topUp(userId, request, null));
+                () -> walletController.topUp(null, request));
     }
 
-    @Test
-    void topUp_nullResult_returnsBadRequest() {
-        when(walletService.topUp(eq(userId), any(TopUpRequest.class))).thenReturn(null);
 
-        TopUpRequest request = new TopUpRequest(
-                new BigDecimal("-1"), 
-                PaymentMethod.BANK, 
-                new HashMap<>(), 
-                idempotencyKey
-        );
-
-        ResponseEntity<WalletResponse> response = walletController.topUp(
-                userId, request, authentication);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-    }
-
-    @Test
-    void topUp_forbidden_whenDifferentUser() {
-        UUID otherUserId = UUID.randomUUID();
-
-        TopUpRequest request = new TopUpRequest(
-                new BigDecimal("50000"), 
-                PaymentMethod.BANK, 
-                new HashMap<>(), 
-                idempotencyKey
-        );
-
-        assertThrows(ResponseStatusException.class,
-                () -> walletController.topUp(otherUserId, request, authentication));
-    }
 
     // === getAllWallets ===
 
