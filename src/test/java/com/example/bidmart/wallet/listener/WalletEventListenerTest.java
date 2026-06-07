@@ -68,21 +68,20 @@ class WalletEventListenerTest {
     }
 
     @Test
-    void handleOrderDelivered_completesOrderPayment() {
+    void handleOrderDelivered_creditsSellerAfterDelivery() {
         UUID orderId = UUID.randomUUID();
         UUID listingId = UUID.randomUUID();
-        UUID buyerId = UUID.randomUUID();
         UUID sellerId = UUID.randomUUID();
         BigDecimal amount = BigDecimal.valueOf(100000);
-        OrderDeliveredEvent event = new OrderDeliveredEvent(orderId, listingId, buyerId, sellerId, amount);
+        OrderDeliveredEvent event = new OrderDeliveredEvent(orderId, listingId, UUID.randomUUID(), sellerId, amount);
 
         listener.handleOrderDelivered(event);
 
-        verify(walletService).completeOrderPayment(orderId, listingId, buyerId, sellerId, amount);
+        verify(walletService).creditSellerAfterDelivery(orderId, listingId, sellerId, amount);
     }
 
     @Test
-    void handleOrderRefunded_refundsOrderPayment() {
+    void handleOrderRefunded_refundsBuyerForOrder() {
         UUID orderId = UUID.randomUUID();
         UUID listingId = UUID.randomUUID();
         UUID buyerId = UUID.randomUUID();
@@ -91,6 +90,6 @@ class WalletEventListenerTest {
 
         listener.handleOrderRefunded(event);
 
-        verify(walletService).refundOrderPayment(orderId, listingId, buyerId, amount);
+        verify(walletService).refundBuyerForOrder(orderId, listingId, buyerId, amount);
     }
 }

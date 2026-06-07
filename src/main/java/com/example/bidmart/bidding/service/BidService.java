@@ -16,6 +16,7 @@ import com.example.bidmart.bidding.validator.BidRuleValidator;
 import com.example.bidmart.common.event.AuctionExtendedEvent;
 import com.example.bidmart.common.event.BidPlacedEvent;
 import com.example.bidmart.common.event.OutbidEvent;
+import com.example.bidmart.common.util.IdempotencyKeyGenerator;
 import com.example.bidmart.listing.model.Listing;
 import com.example.bidmart.listing.service.ListingService;
 import com.example.bidmart.wallet.service.WalletService;
@@ -125,7 +126,8 @@ public class BidService {
                 .orElse(BigDecimal.ZERO);
 
         if (strategy.requiresFundHolding() && reserveTarget.compareTo(previousReservedAmount) > 0) {
-            walletService.reserveBidFunds(buyerId, request.listingId(), reserveTarget);
+            String holdKey = IdempotencyKeyGenerator.generate("BID_HOLD", buyerId, request.listingId(), reserveTarget);
+            walletService.reserveBidFunds(buyerId, request.listingId(), reserveTarget, holdKey);
         }
 
         // Phase 6: persist bid and update listing
@@ -257,10 +259,12 @@ public class BidService {
             return Optional.empty();
         }
 
+        String releaseKey = IdempotencyKeyGenerator.generate("BID_RELEASE", previous.getBuyerId(), previous.getListingId(), previous.getReservedAmount());
         walletService.releaseBidFunds(
                 previous.getBuyerId(),
                 previous.getListingId(),
-                previous.getReservedAmount()
+                previous.getReservedAmount(),
+                releaseKey
         );
 
         return Optional.of(previous);

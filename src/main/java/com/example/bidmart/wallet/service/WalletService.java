@@ -17,21 +17,19 @@ public interface WalletService {
     Wallet withdraw(UUID userId, WithdrawRequest request);
 
     // Bidding
-    Wallet reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal reserveTarget);
     Wallet reserveBidFunds(UUID buyerId, UUID listingId, BigDecimal reserveTarget, String idempotencyKey);
-    Wallet releaseBidFunds(UUID buyerId, UUID listingId, BigDecimal releaseAmount);
     Wallet releaseBidFunds(UUID buyerId, UUID listingId, BigDecimal releaseAmount, String idempotencyKey);
 
-    // Settlement & Audit
-    Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId);
+    // Settlement & Delivery
     Wallet settlePayment(UUID userId, BigDecimal amount, String referenceId, String idempotencyKey);
-    Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId);
     Wallet confirmDelivery(UUID sellerId, BigDecimal amount, String referenceId, String idempotencyKey);
-    void completeOrderPayment(UUID orderId, UUID listingId, UUID buyerId, UUID sellerId, BigDecimal amount);
-    void refundOrderPayment(UUID orderId, UUID listingId, UUID buyerId, BigDecimal amount);
+    void creditSellerAfterDelivery(UUID orderId, UUID listingId, UUID sellerId, BigDecimal amount);
+    void refundBuyerForOrder(UUID orderId, UUID listingId, UUID buyerId, BigDecimal amount);
+
+    // Query
     List<Transaction> getTransactionHistory(UUID userId);
     Transaction getTransactionById(UUID transactionId, UUID userId);
 
-    // User Deactivation 
+    // User Deactivation
     void releaseAllHoldsForUser(UUID userId);
 }

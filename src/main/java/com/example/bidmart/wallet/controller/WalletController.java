@@ -1,6 +1,12 @@
 package com.example.bidmart.wallet.controller;
 
-import com.example.bidmart.wallet.dto.*;
+import com.example.bidmart.wallet.dto.ConfirmDeliveryRequest;
+import com.example.bidmart.wallet.dto.CreateWalletRequest;
+import com.example.bidmart.wallet.dto.HoldBalanceRequest;
+import com.example.bidmart.wallet.dto.TopUpRequest;
+import com.example.bidmart.wallet.dto.TransactionResponse;
+import com.example.bidmart.wallet.dto.WalletResponse;
+import com.example.bidmart.wallet.dto.WithdrawRequest;
 import com.example.bidmart.wallet.exception.InvalidRequestException;
 import com.example.bidmart.wallet.exception.UnauthorizedException;
 import com.example.bidmart.wallet.model.Transaction;
@@ -12,16 +18,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/wallet")
-@CrossOrigin(origins = "*")
 public class WalletController {
 
     private final WalletService walletService;
@@ -41,46 +50,18 @@ public class WalletController {
 
     @GetMapping("/balance")
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_READ)")
-    public ResponseEntity<Wallet> getBalance(Authentication authentication) {
+    public ResponseEntity<WalletResponse> getBalance(Authentication authentication) {
         UUID userId = resolveCurrentUserId(authentication);
         Wallet wallet = walletService.getWalletByUserId(userId);
-        return ResponseEntity.ok(wallet);
+        return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
-    @GetMapping("/{userId}/balance")
-    @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_READ)")
-    public ResponseEntity<Wallet> getBalance(
-            @PathVariable("userId") UUID userId,
-            Authentication authentication
-    ) {
-        ensureCurrentUser(userId, authentication);
-        return getBalance(authentication);
-    }
-
-    @PostMapping({"/{userId}/top-up", "/topup", "/top-up"})
+    @PostMapping("/top-up")
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_TOP_UP)")
-    public ResponseEntity<WalletResponse> topUp(
-            @PathVariable(name = "userId", required = false) UUID userId,
-            @RequestBody TopUpRequest request,
-            Authentication authentication
-    ) {
-        if (userId != null) {
-            ensureCurrentUser(userId, authentication);
-        }
-        UUID authenticatedUserId = resolveCurrentUserId(authentication);
-        Wallet wallet = walletService.topUp(authenticatedUserId, request);
-
-        if (wallet == null) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        WalletResponse response = WalletResponse.builder()
-                .userId(wallet.getUserId())
-                .balanceAvailable(wallet.getBalanceAvailable())
-                .balanceLocked(wallet.getBalanceLocked())
-                .build();
-
-        return ResponseEntity.ok(response);
+    public ResponseEntity<WalletResponse> topUp(Authentication authentication, @RequestBody TopUpRequest request) {
+        UUID userId = resolveCurrentUserId(authentication);
+        Wallet wallet = walletService.topUp(userId, request);
+        return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
     @GetMapping("/list")
@@ -92,51 +73,39 @@ public class WalletController {
     @PostMapping("/hold")
     @PreAuthorize("hasRole('INTERNAL_SERVICE') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_HOLD)")
     public ResponseEntity<WalletResponse> holdBalance(@RequestBody HoldBalanceRequest request) {
-        if (request.getAmount() == null || request.getListingId() == null) {
-            throw new InvalidRequestException("Amount dan listingId harus diisi.");
-        }
-        
+        validateHoldRequest(request);
         Wallet wallet = walletService.reserveBidFunds(
-                request.getBuyerId(), 
-                request.getListingId(), 
-                request.getAmount(), 
+                request.getBuyerId(),
+                request.getListingId(),
+                request.getAmount(),
                 request.getIdempotencyKey()
         );
-        
         return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
     @PostMapping("/release")
     @PreAuthorize("hasRole('INTERNAL_SERVICE') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_RELEASE)")
     public ResponseEntity<WalletResponse> releaseHold(@RequestBody HoldBalanceRequest request) {
-        if (request.getAmount() == null || request.getListingId() == null) {
-            throw new InvalidRequestException("Amount dan listingId harus diisi.");
-        }
-        
+        validateHoldRequest(request);
         Wallet wallet = walletService.releaseBidFunds(
-                request.getBuyerId(), 
-                request.getListingId(), 
-                request.getAmount(), 
+                request.getBuyerId(),
+                request.getListingId(),
+                request.getAmount(),
                 request.getIdempotencyKey()
         );
-        
         return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
     @PostMapping("/settle")
     @PreAuthorize("hasRole('INTERNAL_SERVICE') and hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_SETTLE)")
     public ResponseEntity<WalletResponse> settlePayment(@RequestBody HoldBalanceRequest request) {
-        if (request.getAmount() == null || request.getListingId() == null) {
-            throw new InvalidRequestException("Amount dan listingId harus diisi.");
-        }
-        
+        validateHoldRequest(request);
         Wallet wallet = walletService.settlePayment(
-                request.getBuyerId(), 
-                request.getAmount(), 
-                request.getListingId().toString(), 
+                request.getBuyerId(),
+                request.getAmount(),
+                request.getListingId().toString(),
                 request.getIdempotencyKey()
         );
-        
         return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
@@ -144,11 +113,7 @@ public class WalletController {
     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).WALLET_WITHDRAW)")
     public ResponseEntity<WalletResponse> withdraw(Authentication authentication, @RequestBody WithdrawRequest request) {
         UUID userId = resolveCurrentUserId(authentication);
-
-        Wallet wallet = walletService.withdraw(
-                userId, request
-        );
-        
+        Wallet wallet = walletService.withdraw(userId, request);
         return ResponseEntity.ok(convertToWalletResponse(wallet));
     }
 
@@ -157,11 +122,9 @@ public class WalletController {
     public ResponseEntity<List<TransactionResponse>> getTransactionHistory(Authentication authentication) {
         UUID userId = resolveCurrentUserId(authentication);
         List<Transaction> transactions = walletService.getTransactionHistory(userId);
-        
         List<TransactionResponse> responses = transactions.stream()
                 .map(this::convertToTransactionResponse)
-                .collect(Collectors.toList());
-        
+                .toList();
         return ResponseEntity.ok(responses);
     }
 
@@ -183,15 +146,19 @@ public class WalletController {
         if (request.getSellerId() == null || request.getAmount() == null) {
             throw new InvalidRequestException("SellerId dan amount harus diisi.");
         }
-        
         Wallet wallet = walletService.confirmDelivery(
-                request.getSellerId(), 
-                request.getAmount(), 
-                request.getListingId().toString(), 
+                request.getSellerId(),
+                request.getAmount(),
+                request.getListingId().toString(),
                 request.getIdempotencyKey()
         );
-        
         return ResponseEntity.ok(convertToWalletResponse(wallet));
+    }
+
+    private void validateHoldRequest(HoldBalanceRequest request) {
+        if (request.getAmount() == null || request.getListingId() == null) {
+            throw new InvalidRequestException("Amount dan listingId harus diisi.");
+        }
     }
 
     private UUID resolveCurrentUserId(Authentication authentication) {
@@ -205,12 +172,6 @@ public class WalletController {
                 .orElseThrow(() -> new UnauthorizedException("User tidak ditemukan."));
     }
 
-    private void ensureCurrentUser(UUID userId, Authentication authentication) {
-        UUID authenticatedUserId = resolveCurrentUserId(authentication);
-        if (!authenticatedUserId.equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Akses ditolak.");
-        }
-    }
 
     private WalletResponse convertToWalletResponse(Wallet wallet) {
         return WalletResponse.builder()

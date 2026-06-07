@@ -139,7 +139,7 @@ class BidServiceTest {
             seq.verify(listingService).getListingByIdWithLock(listingId);
             seq.verify(bidRepository).findTopByListingIdOrderByAmountDescCreatedAtAsc(listingId);
             seq.verify(bidRuleValidator).validateBidContext(eq(buyerId), any(), eq(amount), any());
-            seq.verify(walletService).reserveBidFunds(buyerId, listingId, amount);
+            seq.verify(walletService).reserveBidFunds(eq(buyerId), eq(listingId), eq(amount), any());
             seq.verify(bidRepository).save(any(Bid.class));
 
             verify(eventPublisher).publishEvent(any(BidPlacedEvent.class));
@@ -161,7 +161,7 @@ class BidServiceTest {
             verify(listingService, never()).getListingByIdWithLock(any());
             verify(bidRepository, never()).findTopByListingIdOrderByAmountDescCreatedAtAsc(any());
             verify(bidRuleValidator, never()).validateBidContext(any(), any(), any(), any());
-            verify(walletService,   never()).reserveBidFunds(any(), any(), any());
+            verify(walletService,   never()).reserveBidFunds(any(), any(), any(), any());
             verify(bidRepository,   never()).save(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
@@ -184,7 +184,7 @@ class BidServiceTest {
                     .isInstanceOf(BidValidationException.class)
                     .hasMessageContaining("Seller tidak boleh melakukan bid");
 
-            verify(walletService, never()).reserveBidFunds(any(), any(), any());
+            verify(walletService, never()).reserveBidFunds(any(), any(), any(), any());
             verify(bidRepository, never()).save(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
@@ -203,7 +203,7 @@ class BidServiceTest {
 
             verify(bidRuleValidator).validateRequest(request, buyerId);
             verify(bidRuleValidator, never()).validateBidContext(any(), any(), any(), any());
-            verify(walletService,   never()).reserveBidFunds(any(), any(), any());
+            verify(walletService,   never()).reserveBidFunds(any(), any(), any(), any());
             verify(bidRepository,   never()).save(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
@@ -229,8 +229,8 @@ class BidServiceTest {
 
             bidService.placeBid(buyerId, request);
 
-            verify(walletService).reserveBidFunds(buyerId, listingId, new BigDecimal("300.00"));
-            verify(walletService, never()).releaseBidFunds(any(), any(), any());
+            verify(walletService).reserveBidFunds(eq(buyerId), eq(listingId), eq(new BigDecimal("300.00")), any());
+            verify(walletService, never()).releaseBidFunds(any(), any(), any(), any());
             verify(eventPublisher, never()).publishEvent(any(OutbidEvent.class));
             verify(eventPublisher).publishEvent(any(BidPlacedEvent.class));
         }
@@ -257,8 +257,8 @@ class BidServiceTest {
 
             bidService.placeBid(newBuyerId, request);
 
-            verify(walletService).reserveBidFunds(newBuyerId, listingId, newAmount);
-            verify(walletService).releaseBidFunds(eq(previousBuyerId), eq(listingId), eq(previousAmount));
+            verify(walletService).reserveBidFunds(eq(newBuyerId), eq(listingId), eq(newAmount), any());
+            verify(walletService).releaseBidFunds(eq(previousBuyerId), eq(listingId), eq(previousAmount), any());
 
             verify(eventPublisher).publishEvent(any(OutbidEvent.class));
             verify(eventPublisher).publishEvent(any(BidPlacedEvent.class));
@@ -288,7 +288,7 @@ class BidServiceTest {
 
             bidService.placeBid(buyerId, request);
 
-            verify(walletService).reserveBidFunds(buyerId, listingId, proxyMaxLimit);
+            verify(walletService).reserveBidFunds(eq(buyerId), eq(listingId), eq(proxyMaxLimit), any());
             verify(eventPublisher).publishEvent(any(BidPlacedEvent.class));
         }
 
@@ -312,7 +312,7 @@ class BidServiceTest {
 
             bidService.placeBid(buyerId, request);
 
-            verify(walletService, never()).reserveBidFunds(any(), any(), any());
+            verify(walletService, never()).reserveBidFunds(any(), any(), any(), any());
             verify(eventPublisher).publishEvent(any(BidPlacedEvent.class));
         }
 
@@ -581,7 +581,7 @@ class BidServiceTest {
 
             bidService.placeBid(buyerId, request);
 
-            verify(walletService, never()).reserveBidFunds(any(), any(), any());
+            verify(walletService, never()).reserveBidFunds(any(), any(), any(), any());
         }
     }
 }

@@ -12,9 +12,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
-    List<Transaction> findByWalletIdOrderByCreatedAtDesc(UUID walletId);
-    Optional<Transaction> findByReferenceIdAndType(String referenceId, String type);
-    List<Transaction> findByWalletIdAndReferenceId(UUID walletId, String referenceId);
     List<Transaction> findByWalletIdAndType(UUID walletId, TransactionType type);
     Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
 

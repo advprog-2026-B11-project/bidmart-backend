@@ -77,8 +77,8 @@ class AuctionClosingServiceTest {
 
         assertThat(listing.getStatus()).isEqualTo(AuctionStatus.WON);
         verify(listingRepository).save(listing);
-        verify(walletService).settlePayment(winnerId, winningBid, listingId.toString());
-        verify(walletService, never()).releaseBidFunds(eq(winnerId), any(), any());
+        verify(walletService).settlePayment(eq(winnerId), eq(winningBid), eq(listingId.toString()), any());
+        verify(walletService, never()).releaseBidFunds(eq(winnerId), any(), any(), any());
         verify(eventPublisher).publishEvent(any(AuctionWonEvent.class));
     }
 
@@ -97,7 +97,7 @@ class AuctionClosingServiceTest {
 
         assertThat(listing.getStatus()).isEqualTo(AuctionStatus.UNSOLD);
         verify(listingRepository).save(listing);
-        verify(walletService).releaseBidFunds(buyerId, listingId, bidAmount);
+        verify(walletService).releaseBidFunds(eq(buyerId), eq(listingId), eq(bidAmount), any());
         verify(eventPublisher).publishEvent(any(AuctionClosedNoWinnerEvent.class));
     }
 
@@ -114,8 +114,8 @@ class AuctionClosingServiceTest {
 
         assertThat(listing.getStatus()).isEqualTo(AuctionStatus.UNSOLD);
         verify(listingRepository).save(listing);
-        verify(walletService, never()).releaseBidFunds(any(), any(), any());
-        verify(walletService, never()).settlePayment(any(), any(), any());
+        verify(walletService, never()).releaseBidFunds(any(), any(), any(), any());
+        verify(walletService, never()).settlePayment(any(), any(), any(), any());
         verify(eventPublisher).publishEvent(any(AuctionClosedNoWinnerEvent.class));
     }
 
@@ -131,8 +131,8 @@ class AuctionClosingServiceTest {
 
         verify(listingRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
-        verify(walletService, never()).settlePayment(any(), any(), any());
-        verify(walletService, never()).releaseBidFunds(any(), any(), any());
+        verify(walletService, never()).settlePayment(any(), any(), any(), any());
+        verify(walletService, never()).releaseBidFunds(any(), any(), any(), any());
     }
 
     @Test
@@ -154,13 +154,13 @@ class AuctionClosingServiceTest {
                         makeBid(listingId, loser2Id, loser2Bid)
                 ));
         doThrow(new RuntimeException("Wallet error"))
-                .when(walletService).releaseBidFunds(eq(loser1Id), any(), any());
+                .when(walletService).releaseBidFunds(eq(loser1Id), any(), any(), any());
 
         auctionClosingService.closeAuction(listing);
 
-        verify(walletService, never()).releaseBidFunds(eq(winnerId), any(), any());
-        verify(walletService).releaseBidFunds(eq(loser1Id), eq(listingId), eq(loser1Bid));
-        verify(walletService).releaseBidFunds(eq(loser2Id), eq(listingId), eq(loser2Bid));
+        verify(walletService, never()).releaseBidFunds(eq(winnerId), any(), any(), any());
+        verify(walletService).releaseBidFunds(eq(loser1Id), eq(listingId), eq(loser1Bid), any());
+        verify(walletService).releaseBidFunds(eq(loser2Id), eq(listingId), eq(loser2Bid), any());
         verify(eventPublisher).publishEvent(any(AuctionWonEvent.class));
     }
 
@@ -180,13 +180,13 @@ class AuctionClosingServiceTest {
                         makeBid(listingId, buyer2Id, buyer2Bid)
                 ));
         doThrow(new RuntimeException("Wallet error"))
-                .when(walletService).releaseBidFunds(eq(buyer1Id), any(), any());
+                .when(walletService).releaseBidFunds(eq(buyer1Id), any(), any(), any());
 
         auctionClosingService.closeAuction(listing);
 
         assertThat(listing.getStatus()).isEqualTo(AuctionStatus.UNSOLD);
-        verify(walletService).releaseBidFunds(eq(buyer1Id), eq(listingId), eq(buyer1Bid));
-        verify(walletService).releaseBidFunds(eq(buyer2Id), eq(listingId), eq(buyer2Bid));
+        verify(walletService).releaseBidFunds(eq(buyer1Id), eq(listingId), eq(buyer1Bid), any());
+        verify(walletService).releaseBidFunds(eq(buyer2Id), eq(listingId), eq(buyer2Bid), any());
         verify(eventPublisher).publishEvent(any(AuctionClosedNoWinnerEvent.class));
     }
 
@@ -210,8 +210,8 @@ class AuctionClosingServiceTest {
 
         auctionClosingService.closeAuction(listing);
 
-        verify(walletService, times(1)).releaseBidFunds(eq(loserId), eq(listingId), eq(loserBid1));
-        verify(walletService, never()).releaseBidFunds(eq(loserId), eq(listingId), eq(loserBid2));
+        verify(walletService, times(1)).releaseBidFunds(eq(loserId), eq(listingId), eq(loserBid1), any());
+        verify(walletService, never()).releaseBidFunds(eq(loserId), eq(listingId), eq(loserBid2), any());
     }
 
     @Test
@@ -231,6 +231,6 @@ class AuctionClosingServiceTest {
 
         auctionClosingService.closeAuction(listing);
 
-        verify(walletService, times(1)).releaseBidFunds(eq(buyerId), eq(listingId), eq(bid1));
+        verify(walletService, times(1)).releaseBidFunds(eq(buyerId), eq(listingId), eq(bid1), any());
     }
 }
