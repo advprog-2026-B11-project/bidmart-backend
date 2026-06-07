@@ -22,27 +22,18 @@ public class BankPaymentStrategy implements PaymentStrategy {
 
     @Override
     public void validateDetails(Map<String, String> details) {
-        if (details == null
-                || !details.containsKey(REQUIRED_FIELD_BANK_NAME)
-                || !details.containsKey(REQUIRED_FIELD_ACCOUNT_NUM)) {
-            throw new InvalidRequestException(
-                    "Untuk metode BANK, 'bankName' dan 'accountNumber' wajib diisi.");
+        if (details == null || !details.containsKey(REQUIRED_FIELD_BANK_NAME) || !details.containsKey(REQUIRED_FIELD_ACCOUNT_NUM)) {
+            throw new InvalidRequestException("Untuk metode BANK, 'bankName' dan 'accountNumber' wajib diisi.");
         }
     }
 
     @Override
     public String generateTransactionNote(TransactionType transactionType, BigDecimal amount, Map<String, String> details) {
-        String bankName   = sanitize(details.get(REQUIRED_FIELD_BANK_NAME));
-        String accountNum = sanitize(details.get(REQUIRED_FIELD_ACCOUNT_NUM));
+        String bankName   = details.get(REQUIRED_FIELD_BANK_NAME);
+        String accountNum = details.get(REQUIRED_FIELD_ACCOUNT_NUM);
 
         return transactionType == TransactionType.TOPUP
-                ? "Top-Up via "  + bankName + " (Virtual Account: " + accountNum + ")"
-                : "Withdraw to " + bankName + " (Rekening: "        + accountNum + ")";
-    }
-
-    /** Strips HTML-unsafe characters to prevent stored XSS in transaction notes. */
-    private String sanitize(String input) {
-        if (input == null) return "";
-        return input.replaceAll("[<>\"'&]", "");
+            ? "Top-Up via "  + bankName + " (Virtual Account: " + accountNum + ")"
+            : "Withdraw to " + bankName + " (Rekening: "        + accountNum + ")";
     }
 }
