@@ -110,7 +110,7 @@ public class NotificationController {
     }
 
     @PostMapping("/test-create")
-    @PreAuthorize("hasAuthority('SCOPE_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Notification> createTestNotification(@RequestBody Map<String, String> requestBody) {
         UUID userId = UUID.fromString(requestBody.get("userId"));
         String type = requestBody.get("type");
