@@ -35,7 +35,7 @@ class OrderServiceTest {
     private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
-    private OrderService orderService;
+    private OrderServiceImpl orderService;
 
     private UUID orderId, listingId, buyerId, sellerId;
     private Order order;

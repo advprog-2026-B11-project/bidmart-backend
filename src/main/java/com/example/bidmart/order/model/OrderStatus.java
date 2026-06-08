@@ -1,32 +1,24 @@
 package com.example.bidmart.order.model;
 
+import com.example.bidmart.order.state.*;
+
 public enum OrderStatus {
-    DRAFT,
-    CREATED,
-    SHIPPED,
-    DELIVERED,
-    DISPUTED,
-    CANCELLED;
+    DRAFT(new DraftState()),
+    CREATED(new CreatedState()),
+    SHIPPED(new ShippedState()),
+    DELIVERED(new DeliveredState()),
+    DISPUTED(new DisputedState()),
+    CANCELLED(new CancelledState());
+
+    private final OrderState state;
+
+    OrderStatus(OrderState state) {
+        this.state = state;
+    }
 
     public boolean canTransitionTo(OrderStatus nextStatus) {
         if (this == nextStatus) return true;
-        
-        switch (this) {
-            case DRAFT:
-                return nextStatus == CREATED || nextStatus == CANCELLED;
-            case CREATED:
-                return nextStatus == SHIPPED || nextStatus == CANCELLED;
-            case SHIPPED:
-                return nextStatus == DELIVERED || nextStatus == DISPUTED;
-            case DELIVERED:
-                return nextStatus == DISPUTED;
-            case DISPUTED:
-                return nextStatus == DELIVERED || nextStatus == CANCELLED;
-            case CANCELLED:
-                return false;
-            default:
-                return false;
-        }
+        return this.state.canTransitionTo(nextStatus);
     }
     
     public static OrderStatus fromString(String statusStr) {
@@ -36,4 +28,4 @@ public enum OrderStatus {
             throw new IllegalArgumentException("Status Order tidak valid: " + statusStr);
         }
     }
-}
+}

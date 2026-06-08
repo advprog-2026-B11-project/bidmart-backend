@@ -115,11 +115,68 @@ public class NotificationEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleWithdraw(WithdrawEvent event) {
-        String message = String.format(
-                "Penarikan berhasil! Rp %s sedang diproses ke rekening bank %s Anda.",
-                String.format("%,.0f", event.amount()), event.bankName()
-        );
+        String rawDest = event.bankName();
+        String destFormatted = formatWithdrawalDestination(rawDest);
+        String message;
+        if (rawDest != null && rawDest.contains("phoneNumber")) {
+            message = String.format(
+                    "Penarikan berhasil! Rp %s sedang diproses ke akun %s Anda.",
+                    String.format("%,.0f", event.amount()), destFormatted
+            );
+        } else {
+            message = String.format(
+                    "Penarikan berhasil! Rp %s sedang diproses ke rekening bank %s Anda.",
+                    String.format("%,.0f", event.amount()), destFormatted
+            );
+        }
         notificationService.createNotification(event.userId(), "BALANCE_WITHDRAW", message);
+    }
+
+    private String formatWithdrawalDestination(String destination) {
+        if (destination == null) {
+            return "tujuan Anda";
+        }
+        
+        String cleaned = destination.trim();
+        if (cleaned.startsWith("{") && cleaned.endsWith("}")) {
+            cleaned = cleaned.substring(1, cleaned.length() - 1);
+        }
+        
+        String bankName = null;
+        String accountNumber = null;
+        String phoneNumber = null;
+        
+        String[] pairs = cleaned.split(",\\s*");
+        for (String pair : pairs) {
+            String[] kv = pair.split("=");
+            if (kv.length == 2) {
+                String key = kv[0].trim();
+                String val = kv[1].trim();
+                if ("bankName".equalsIgnoreCase(key)) {
+                    bankName = val;
+                } else if ("accountNumber".equalsIgnoreCase(key)) {
+                    accountNumber = val;
+                } else if ("phoneNumber".equalsIgnoreCase(key)) {
+                    phoneNumber = val;
+                }
+            }
+        }
+        
+        if (phoneNumber != null) {
+            String maskedPhone = maskPhone(phoneNumber);
+            return "GoPay (" + maskedPhone + ")";
+        } else if (bankName != null && accountNumber != null) {
+            return bankName + " (Rekening: " + accountNumber + ")";
+        } else if (bankName != null) {
+            return bankName;
+        }
+        
+        return destination;
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() <= 8) return "****";
+        return phone.substring(0, 4) + "****" + phone.substring(phone.length() - 4);
     }
 
     @Async

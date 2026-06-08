@@ -69,6 +69,12 @@ public class EmailServiceImpl implements EmailService {
         sendEmail(toEmail, mfaSubject, buildMfaCodeEmailBody(code), "MFA code email");
     }
 
+    @Async
+    @Override
+    public void sendNotificationEmail(String toEmail, String subject, String body) {
+        sendEmail(toEmail, subject, body, "notification email");
+    }
+
     private void sendEmail(String toEmail, String subject, String htmlContent, String description) {
         Map<String, Object> payload = Map.of(
                 "sender", Map.of("name", fromName, "email", fromAddress),

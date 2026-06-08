@@ -5,13 +5,12 @@ import com.example.bidmart.notification.model.Notification;
 import com.example.bidmart.notification.model.NotificationPreference;
 import com.example.bidmart.notification.repository.NotificationPreferenceRepository;
 import com.example.bidmart.notification.repository.NotificationRepository;
+import com.example.bidmart.notification.delivery.NotificationDeliveryChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -34,10 +33,9 @@ class NotificationServiceTest {
     private NotificationPreferenceRepository preferenceRepository;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private NotificationDeliveryChannel deliveryChannel;
 
-    @InjectMocks
-    private NotificationService notificationService;
+    private NotificationServiceImpl notificationService;
 
     private UUID userId;
     private UUID notificationId;
@@ -58,6 +56,12 @@ class NotificationServiceTest {
                 .inAppEnabled(true)
                 .mutedTypes(new HashSet<>())
                 .build();
+
+        notificationService = new NotificationServiceImpl(
+                notificationRepository,
+                preferenceRepository,
+                List.of(deliveryChannel)
+        );
     }
 
     @Test
@@ -65,6 +69,7 @@ class NotificationServiceTest {
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.empty());
         when(preferenceRepository.save(any(NotificationPreference.class))).thenReturn(preference);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+        when(deliveryChannel.supports(any())).thenReturn(true);
 
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
 
@@ -72,7 +77,7 @@ class NotificationServiceTest {
         assertEquals(userId, result.getUserId());
         assertEquals("DELIVERED", result.getDeliveryStatus());
         verify(notificationRepository, times(2)).save(any(Notification.class));
-        verify(messagingTemplate, times(1)).convertAndSendToUser(eq(userId.toString()), eq("/queue/notifications"), any());
+        verify(deliveryChannel, times(1)).send(any(Notification.class), any());
     }
 
     @Test
@@ -84,7 +89,7 @@ class NotificationServiceTest {
 
         assertNull(result);
         verify(notificationRepository, never()).save(any(Notification.class));
-        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+        verify(deliveryChannel, never()).send(any(), any());
     }
 
     @Test
@@ -92,6 +97,7 @@ class NotificationServiceTest {
         preference.setMutedTypes(null);
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+        when(deliveryChannel.supports(any())).thenReturn(true);
 
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
 
@@ -103,9 +109,10 @@ class NotificationServiceTest {
     void createNotification_pushThrowsException_deliveryStatusFailed() {
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+        when(deliveryChannel.supports(any())).thenReturn(true);
 
         doThrow(new RuntimeException("WebSocket Error"))
-                .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
+                .when(deliveryChannel).send(any(), any());
 
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Pesan Error WS");
 
@@ -119,12 +126,13 @@ class NotificationServiceTest {
         preference.setPushEnabled(false);
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
         when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
+        when(deliveryChannel.supports(any())).thenReturn(false);
 
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Pesan Tanpa Push");
 
         assertNotNull(result);
         assertEquals("DELIVERED", result.getDeliveryStatus());
-        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+        verify(deliveryChannel, never()).send(any(), any());
     }
 
     @Test
@@ -145,14 +153,14 @@ class NotificationServiceTest {
         preference.setInAppEnabled(false);
         preference.setPushEnabled(true);
         when(preferenceRepository.findByUserId(userId)).thenReturn(Optional.of(preference));
-
+        when(deliveryChannel.supports(any())).thenReturn(true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(i -> i.getArgument(0));
 
         Notification result = notificationService.createNotification(userId, "TEST_TYPE", "Test Message");
 
         assertNotNull(result);
         verify(notificationRepository, times(1)).save(any(Notification.class));
-        verify(messagingTemplate, times(1)).convertAndSendToUser(eq(userId.toString()), eq("/queue/notifications"), any());
+        verify(deliveryChannel, times(1)).send(any(Notification.class), any());
     }
 
     @Test
