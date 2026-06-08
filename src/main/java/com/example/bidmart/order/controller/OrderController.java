@@ -26,7 +26,6 @@ public class OrderController {
     private final UserService userService;
 
     @GetMapping("/buyer/{buyerId}")
-//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_READ)")
     @PreAuthorize("hasAuthority('order:read') and (#buyerId.toString() == authentication.name or hasAuthority('SCOPE_ADMIN'))")
     public ResponseEntity<List<Order>> getOrdersByBuyer(@PathVariable UUID buyerId) {
         List<Order> orders = orderService.getOrdersByUser(buyerId);
@@ -61,9 +60,6 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
-//     @PatchMapping("/{orderId}/status")
-//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_UPDATE_STATUS)")
-//     public ResponseEntity<Order> updateOrderStatus(
     @PatchMapping("/{orderId}/tracking")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> updateTrackingNumber(
@@ -76,9 +72,6 @@ public class OrderController {
         return ResponseEntity.ok(updatedOrder);
     }
 
-//     @PatchMapping("/{orderId}/tracking")
-//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_UPDATE_TRACKING)")
-//     public ResponseEntity<Order> updateTrackingNumber(
     @PatchMapping("/{orderId}/confirm")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> confirmDelivery(
@@ -90,14 +83,10 @@ public class OrderController {
         return ResponseEntity.ok(updatedOrder);
     }
 
-//     @PostMapping("/test-create")
-//     @PreAuthorize("hasAuthority(T(com.example.bidmart.common.security.PermissionNames).ORDER_CREATE)")
-//     public ResponseEntity<Order> createOrderTest(@RequestBody Map<String, String> requestBody) {
-//         UUID listingId = UUID.fromString(requestBody.get("listingId"));
-//         UUID buyerId = UUID.fromString(requestBody.get("buyerId"));
     @PatchMapping("/{orderId}/dispute")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Order> disputeOrder(
+
             @PathVariable("orderId") UUID orderId,
             @Valid @RequestBody DisputeRequest request,
             Authentication authentication) {
