@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -153,7 +154,29 @@ class NotificationEventListenerTest {
         WithdrawEvent event = new WithdrawEvent(userId, amount, "BCA");
         notificationEventListener.handleWithdraw(event);
 
-        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_WITHDRAW"), anyString());
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_WITHDRAW"), argThat(msg -> msg.contains("rekening bank BCA Anda")));
+    }
+
+    @Test
+    void handleWithdraw_gopay_success() {
+        UUID userId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(25000);
+
+        WithdrawEvent event = new WithdrawEvent(userId, amount, "{phoneNumber=081234567890}");
+        notificationEventListener.handleWithdraw(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_WITHDRAW"), argThat(msg -> msg.contains("akun GoPay (0812****7890) Anda")));
+    }
+
+    @Test
+    void handleWithdraw_bankMap_success() {
+        UUID userId = UUID.randomUUID();
+        BigDecimal amount = BigDecimal.valueOf(25000);
+
+        WithdrawEvent event = new WithdrawEvent(userId, amount, "{bankName=BCA, accountNumber=1234567890}");
+        notificationEventListener.handleWithdraw(event);
+
+        verify(notificationService, times(1)).createNotification(eq(userId), eq("BALANCE_WITHDRAW"), argThat(msg -> msg.contains("rekening bank BCA (Rekening: 1234567890) Anda")));
     }
 
     @Test
